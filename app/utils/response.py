@@ -1,6 +1,8 @@
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import Request
+from fastapi.responses import JSONResponse
 
 
 class APIError(Exception):
@@ -12,8 +14,10 @@ class APIError(Exception):
         super().__init__(message)
 
 
-def request_id(request: Request) -> str:
-    return getattr(request.state, "request_id", "req_unknown")
+def request_id(request: Request | None = None) -> str:
+    if request is not None:
+        return getattr(request.state, "request_id", "req_unknown")
+    return f"req_{uuid.uuid4().hex[:12]}"
 
 
 def meta(request: Request) -> dict:
@@ -32,11 +36,14 @@ def success(data, message: str, request: Request, pagination: dict | None = None
     return body
 
 
-def error(request: Request, code: str, message: str, details=None) -> dict:
-    return {
-        "success": False,
-        "message": message,
-        "error": {"code": code, "details": details},
-        "data": None,
-        "meta": meta(request),
-    }
+def error(request: Request, status_code: int, code: str, message: str, details=None) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "success": False,
+            "message": message,
+            "error": {"code": code, "details": details},
+            "data": None,
+            "meta": meta(request),
+        },
+    )

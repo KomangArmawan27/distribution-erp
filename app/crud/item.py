@@ -21,6 +21,21 @@ NAME_ORDER = ["sub_group", "brand_group", "series_group", "flavour_group", "pack
 _LOOKUP_NAMES = {GROUP_LOOKUPS[f]: f for f in GROUP_LOOKUPS}
 
 
+async def find_missing_group(db: AsyncSession, values: dict) -> tuple[str, int] | None:
+    noids = {GROUP_LOOKUPS[f]: values.get(f) for f in GROUP_LOOKUPS if values.get(f) is not None}
+    if not noids:
+        return None
+    rows = (
+        await db.execute(select(Group.group_name, Group.group_noid).where(Group.group_name.in_(noids)))
+    ).all()
+    existing = {(g.group_name, g.group_noid) for g in rows}
+    for field, group_name in GROUP_LOOKUPS.items():
+        noid = values.get(field)
+        if noid is not None and (group_name, noid) not in existing:
+            return (group_name, noid)
+    return None
+
+
 async def _generate_item_no(db: AsyncSession, flavour_group: str | None) -> str:
     if not flavour_group:
         raise ValueError("item_no and flavour_group are both missing; cannot generate item_no")

@@ -13,6 +13,18 @@ from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
 router = APIRouter(prefix="/groups", tags=["Groups"])
 
 
+async def _ensure_noid_free(db: AsyncSession, group_name: str, group_noid: int, exclude_group_id: int | None = None) -> None:
+    stmt = select(Group.group_id).where(Group.group_name == group_name, Group.group_noid == group_noid)
+    if exclude_group_id is not None:
+        stmt = stmt.where(Group.group_id != exclude_group_id)
+    if (await db.execute(stmt)).scalar_one_or_none() is not None:
+        raise APIError(
+            409,
+            "GROUP_NOID_TAKEN",
+            f"group_noid {group_noid} is already taken for group '{group_name}'",
+        )
+
+
 @router.get("/", response_model=Envelope[list[GroupRead]], response_model_exclude_none=True)
 async def list_groups(
     request: Request,
@@ -37,12 +49,13 @@ async def list_groups(
 async def get_group(group_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     obj = await group_crud.get(db, group_id)
     if not obj:
-        raise APIError(404, "GROUP_NOT_FOUND", "Group not found")
+        raise APIError(404, "GROUP_NOT_FOUND", f"Group {group_id} not found")
     return success(GroupRead.model_validate(obj), "Group fetched successfully", request)
 
 
 @router.post("/", response_model=Envelope[GroupRead], status_code=201, response_model_exclude_none=True)
 async def create_group(payload: GroupCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    await _ensure_noid_free(db, payload.group_name, payload.group_noid)
     obj = await group_crud.create(db, payload)
     return success(GroupRead.model_validate(obj), "Group created successfully", request)
 
@@ -51,7 +64,12 @@ async def create_group(payload: GroupCreate, request: Request, db: AsyncSession 
 async def update_group(group_id: int, payload: GroupUpdate, request: Request, db: AsyncSession = Depends(get_db)):
     obj = await group_crud.get(db, group_id)
     if not obj:
-        raise APIError(404, "GROUP_NOT_FOUND", "Group not found")
+        raise APIError(404, "GROUP_NOT_FOUND", f"Group {group_id} not found")
+    changes = payload.model_dump(exclude_unset=True)
+    group_name = changes.get("group_name", obj.group_name)
+    group_noid = changes.get("group_noid", obj.group_noid)
+    if changes:
+        await _ensure_noid_free(db, group_name, group_noid, exclude_group_id=group_id)
     obj = await group_crud.update(db, obj, payload)
     return success(GroupRead.model_validate(obj), "Group updated successfully", request)
 
@@ -60,4 +78,4 @@ async def update_group(group_id: int, payload: GroupUpdate, request: Request, db
 async def delete_group(group_id: int, db: AsyncSession = Depends(get_db)):
     ok = await group_crud.delete(db, group_id)
     if not ok:
-        raise APIError(404, "GROUP_NOT_FOUND", "Group not found")
+        raise APIError(404, "GROUP_NOT_FOUND", f"Group {group_id} not found")
