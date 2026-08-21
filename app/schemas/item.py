@@ -1,7 +1,16 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class ItemBase(BaseModel):
+class _UppercaseMixin:
+    @field_validator("flavour_group", "item_no")
+    @classmethod
+    def _to_upper(cls, v):
+        if v is None:
+            return v
+        return str(v).strip().upper()
+
+
+class ItemBase(_UppercaseMixin, BaseModel):
     item_no: str | None = Field(default=None, max_length=50)
     sub_group: int | None = None
     brand_group: int | None = None
@@ -17,7 +26,7 @@ class ItemCreate(ItemBase):
     pass
 
 
-class ItemUpdate(BaseModel):
+class ItemUpdate(_UppercaseMixin, BaseModel):
     item_no: str | None = Field(default=None, max_length=50)
     sub_group: int | None = None
     brand_group: int | None = None
