@@ -1,3 +1,3 @@
-from . import group, item, item_pricelist
+from . import group, item, item_pricelist, employee, sales_person, customer
 
-__all__ = ["group", "item", "item_pricelist"]
+__all__ = ["group", "item", "item_pricelist", "employee", "sales_person", "customer"]

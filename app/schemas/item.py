@@ -44,3 +44,9 @@ class ItemRead(ItemBase):
     item_id: int
     item_name: str
     item_no: str
+    sub_group_display: str | None = None
+    brand_group_display: str | None = None
+    series_group_display: str | None = None
+    pack_group_display: str | None = None
+    ml_group_display: str | None = None
+    nic_group_display: str | None = None

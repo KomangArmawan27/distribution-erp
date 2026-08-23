@@ -7,7 +7,7 @@ from alembic import context
 
 from app.config.settings import settings
 from app.config.database import Base
-from app.models import group, item, item_pricelist  # noqa: F401  (populate metadata)
+from app.models import group, item, item_pricelist, employee, sales_person, customer  # noqa: F401  (populate metadata)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

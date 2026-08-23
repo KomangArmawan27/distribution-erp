@@ -2,10 +2,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 
-from app.routers import group, item, item_pricelist
+from app.routers import group, item, item_pricelist, employee, sales_person, customer
 from app.routers.group import router as group_router
 from app.routers.item import router as item_router
 from app.routers.item_pricelist import router as price_router
+from app.routers.employee import router as employee_router
+from app.routers.sales_person import router as sales_person_router
+from app.routers.customer import router as customer_router
 from app.utils.response import APIError, error, meta, request_id
 
 load_dotenv()
@@ -42,3 +45,6 @@ async def health(request: Request):
 app.include_router(group_router)
 app.include_router(item_router)
 app.include_router(price_router)
+app.include_router(employee_router)
+app.include_router(sales_person_router)
+app.include_router(customer_router)

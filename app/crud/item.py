@@ -1,8 +1,8 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.base import CRUDBase
-from app.crud.group import get_group_value
+from app.crud.base import CRUDBase, PageResult
+from app.crud.group import get_group_value, populate_group_displays
 from app.models import Group, Item
 from app.schemas.item import ItemCreate, ItemUpdate
 
@@ -76,6 +76,23 @@ async def _build_item_name(db: AsyncSession, values: dict) -> str:
 
 
 class CRUDItem(CRUDBase[Item, ItemCreate, ItemUpdate]):
+    async def get(self, db: AsyncSession, id_: int) -> Item | None:
+        obj = await super().get(db, id_)
+        if obj:
+            await populate_group_displays(db, [obj], GROUP_LOOKUPS)
+        return obj
+
+    async def page(
+        self,
+        db: AsyncSession,
+        page: int = 1,
+        per_page: int = 20,
+        extra_filter=None,
+    ) -> PageResult:
+        page_result = await super().page(db, page=page, per_page=per_page, extra_filter=extra_filter)
+        await populate_group_displays(db, page_result.items, GROUP_LOOKUPS)
+        return page_result
+
     async def create(self, db: AsyncSession, obj_in: ItemCreate) -> Item:
         data = obj_in.model_dump()
         if not data.get("item_no"):
@@ -85,6 +102,7 @@ class CRUDItem(CRUDBase[Item, ItemCreate, ItemUpdate]):
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)
+        await populate_group_displays(db, [db_obj], GROUP_LOOKUPS)
         return db_obj
 
     async def update(self, db: AsyncSession, db_obj: Item, obj_in: ItemUpdate) -> Item:
@@ -96,6 +114,7 @@ class CRUDItem(CRUDBase[Item, ItemCreate, ItemUpdate]):
             setattr(db_obj, field, value)
         await db.commit()
         await db.refresh(db_obj)
+        await populate_group_displays(db, [db_obj], GROUP_LOOKUPS)
         return db_obj
 
 
