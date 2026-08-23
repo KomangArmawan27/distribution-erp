@@ -35,11 +35,11 @@ async def list_prices(
     )
 
 
-@router.get("/{price_id}", response_model=Envelope[ItemPriceListRead], response_model_exclude_none=True)
-async def get_price(price_id: int, request: Request, db: AsyncSession = Depends(get_db)):
-    obj = await item_pricelist_crud.get(db, price_id)
+@router.get("/{pricelist_id}", response_model=Envelope[ItemPriceListRead], response_model_exclude_none=True)
+async def get_price(pricelist_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    obj = await item_pricelist_crud.get(db, pricelist_id)
     if not obj:
-        raise APIError(404, "PRICE_NOT_FOUND", f"Price record {price_id} not found")
+        raise APIError(404, "PRICE_NOT_FOUND", f"Price record {pricelist_id} not found")
     return success(ItemPriceListRead.model_validate(obj), "Price record fetched successfully", request)
 
 
@@ -50,19 +50,19 @@ async def create_price(payload: ItemPriceListCreate, request: Request, db: Async
     return success(ItemPriceListRead.model_validate(obj), "Price record created successfully", request)
 
 
-@router.put("/{price_id}", response_model=Envelope[ItemPriceListRead], response_model_exclude_none=True)
-async def update_price(price_id: int, payload: ItemPriceListUpdate, request: Request, db: AsyncSession = Depends(get_db)):
-    obj = await item_pricelist_crud.get(db, price_id)
+@router.put("/{pricelist_id}", response_model=Envelope[ItemPriceListRead], response_model_exclude_none=True)
+async def update_price(pricelist_id: int, payload: ItemPriceListUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+    obj = await item_pricelist_crud.get(db, pricelist_id)
     if not obj:
-        raise APIError(404, "PRICE_NOT_FOUND", f"Price record {price_id} not found")
+        raise APIError(404, "PRICE_NOT_FOUND", f"Price record {pricelist_id} not found")
     if payload.item_id is not None and payload.item_id != obj.item_id:
         await _ensure_item_exists(db, payload.item_id)
     obj = await item_pricelist_crud.update(db, obj, payload)
     return success(ItemPriceListRead.model_validate(obj), "Price record updated successfully", request)
 
 
-@router.delete("/{price_id}", status_code=204)
-async def delete_price(price_id: int, db: AsyncSession = Depends(get_db)):
-    ok = await item_pricelist_crud.delete(db, price_id)
+@router.delete("/{pricelist_id}", status_code=204)
+async def delete_price(pricelist_id: int, db: AsyncSession = Depends(get_db)):
+    ok = await item_pricelist_crud.delete(db, pricelist_id)
     if not ok:
-        raise APIError(404, "PRICE_NOT_FOUND", f"Price record {price_id} not found")
+        raise APIError(404, "PRICE_NOT_FOUND", f"Price record {pricelist_id} not found")

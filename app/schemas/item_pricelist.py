@@ -24,4 +24,6 @@ class ItemPriceListUpdate(BaseModel):
 class ItemPriceListRead(ItemPriceListBase):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    pricelist_id: int
+    item_no: str | None = None
+    item_desc: str | None = None
