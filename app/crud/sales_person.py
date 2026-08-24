@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.base import CRUDBase, PageResult
 from app.crud.group import populate_group_displays
-from app.models import SalesPerson
+from app.models import Group, SalesPerson
 from app.schemas.sales_person import SalesPersonCreate, SalesPersonUpdate
 
 SALES_PERSON_GROUP_MAPPING = {
@@ -11,6 +11,21 @@ SALES_PERSON_GROUP_MAPPING = {
     "sales_level": "SALES LEVEL",
     "status": "EMPLOYEE STATUS",
 }
+
+
+async def find_missing_group(db: AsyncSession, values: dict) -> tuple[str, int] | None:
+    noids = {SALES_PERSON_GROUP_MAPPING[f]: values.get(f) for f in SALES_PERSON_GROUP_MAPPING if values.get(f) is not None}
+    if not noids:
+        return None
+    rows = (
+        await db.execute(select(Group.group_name, Group.group_noid).where(Group.group_name.in_(noids)))
+    ).all()
+    existing = {(g.group_name, g.group_noid) for g in rows}
+    for field, group_name in SALES_PERSON_GROUP_MAPPING.items():
+        noid = values.get(field)
+        if noid is not None and (group_name, noid) not in existing:
+            return (group_name, noid)
+    return None
 
 
 class CRUDSalesPerson(CRUDBase[SalesPerson, SalesPersonCreate, SalesPersonUpdate]):

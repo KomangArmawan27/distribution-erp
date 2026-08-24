@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.customer import customer_crud
+from app.crud.customer import customer_crud, find_missing_group
 from app.crud.sales_person import sales_person_crud
 from app.config.database import get_db
 from app.utils.pagination import build_links, pagination_dict
@@ -16,6 +16,13 @@ async def _ensure_sales_person_exists(db: AsyncSession, sales_person_id: int | N
     if sales_person_id is not None:
         if not await sales_person_crud.get(db, sales_person_id):
             raise APIError(404, "SALES_PERSON_NOT_FOUND", f"Sales person {sales_person_id} not found")
+
+
+async def _ensure_groups_exist(db: AsyncSession, values: dict) -> None:
+    missing = await find_missing_group(db, values)
+    if missing:
+        group_name, noid = missing
+        raise APIError(404, "GROUP_NOT_FOUND", f"Group '{group_name}' noid {noid} not found")
 
 
 @router.get("/", response_model=Envelope[list[CustomerRead]], response_model_exclude_none=True)
@@ -47,6 +54,7 @@ async def get_customer(customer_id: int, request: Request, db: AsyncSession = De
 @router.post("/", response_model=Envelope[CustomerRead], response_model_exclude_none=True, status_code=201)
 async def create_customer(payload: CustomerCreate, request: Request, db: AsyncSession = Depends(get_db)):
     await _ensure_sales_person_exists(db, payload.sales_person_id)
+    await _ensure_groups_exist(db, payload.model_dump())
     obj = await customer_crud.create(db, payload)
     return success(CustomerRead.model_validate(obj), "Customer created successfully", request)
 
@@ -58,6 +66,7 @@ async def update_customer(customer_id: int, payload: CustomerUpdate, request: Re
         raise APIError(404, "CUSTOMER_NOT_FOUND", f"Customer {customer_id} not found")
     if payload.sales_person_id is not None and payload.sales_person_id != obj.sales_person_id:
         await _ensure_sales_person_exists(db, payload.sales_person_id)
+    await _ensure_groups_exist(db, payload.model_dump(exclude_unset=True))
     obj = await customer_crud.update(db, obj, payload)
     return success(CustomerRead.model_validate(obj), "Customer updated successfully", request)
 

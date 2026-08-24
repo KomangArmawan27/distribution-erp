@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.employee import employee_crud
+from app.crud.employee import employee_crud, find_missing_group
 from app.config.database import get_db
 from app.utils.pagination import build_links, pagination_dict
 from app.utils.response import APIError, success
@@ -9,6 +9,13 @@ from app.schemas.envelope import Envelope
 from app.schemas.employee import EmployeeCreate, EmployeeRead, EmployeeUpdate
 
 router = APIRouter(prefix="/employees", tags=["Employee Master"])
+
+
+async def _ensure_groups_exist(db: AsyncSession, values: dict) -> None:
+    missing = await find_missing_group(db, values)
+    if missing:
+        group_name, noid = missing
+        raise APIError(404, "GROUP_NOT_FOUND", f"Group '{group_name}' noid {noid} not found")
 
 
 @router.get("/", response_model=Envelope[list[EmployeeRead]], response_model_exclude_none=True)
@@ -39,6 +46,7 @@ async def get_employee(employee_id: int, request: Request, db: AsyncSession = De
 
 @router.post("/", response_model=Envelope[EmployeeRead], response_model_exclude_none=True, status_code=201)
 async def create_employee(payload: EmployeeCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    await _ensure_groups_exist(db, payload.model_dump())
     obj = await employee_crud.create(db, payload)
     return success(EmployeeRead.model_validate(obj), "Employee created successfully", request)
 
@@ -48,6 +56,7 @@ async def update_employee(employee_id: int, payload: EmployeeUpdate, request: Re
     obj = await employee_crud.get(db, employee_id)
     if not obj:
         raise APIError(404, "EMPLOYEE_NOT_FOUND", f"Employee {employee_id} not found")
+    await _ensure_groups_exist(db, payload.model_dump(exclude_unset=True))
     obj = await employee_crud.update(db, obj, payload)
     return success(EmployeeRead.model_validate(obj), "Employee updated successfully", request)
 

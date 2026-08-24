@@ -1,7 +1,16 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class CustomerBase(BaseModel):
+class _UppercaseMixin:
+    @field_validator("customer_no")
+    @classmethod
+    def _to_upper(cls, v):
+        if v is None:
+            return v
+        return str(v).strip().upper()
+
+
+class CustomerBase(_UppercaseMixin, BaseModel):
     customer_no: str | None = Field(default=None, max_length=50)
     customer_name: str = Field(max_length=255)
     customer_type: int | None = None
@@ -16,7 +25,7 @@ class CustomerCreate(CustomerBase):
     pass
 
 
-class CustomerUpdate(BaseModel):
+class CustomerUpdate(_UppercaseMixin, BaseModel):
     customer_no: str | None = Field(default=None, max_length=50)
     customer_name: str | None = Field(default=None, max_length=255)
     customer_type: int | None = None

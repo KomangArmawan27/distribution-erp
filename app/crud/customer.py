@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.base import CRUDBase, PageResult
 from app.crud.group import populate_group_displays
-from app.models import Customer
+from app.models import Group, Customer
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 
 CUSTOMER_GROUP_MAPPING = {
@@ -11,6 +11,36 @@ CUSTOMER_GROUP_MAPPING = {
     "city_region": "CUSTOMER REGION",
     "status": "CUSTOMER STATUS",
 }
+
+
+async def find_missing_group(db: AsyncSession, values: dict) -> tuple[str, int] | None:
+    noids = {CUSTOMER_GROUP_MAPPING[f]: values.get(f) for f in CUSTOMER_GROUP_MAPPING if values.get(f) is not None}
+    if not noids:
+        return None
+    rows = (
+        await db.execute(select(Group.group_name, Group.group_noid).where(Group.group_name.in_(noids)))
+    ).all()
+    existing = {(g.group_name, g.group_noid) for g in rows}
+    for field, group_name in CUSTOMER_GROUP_MAPPING.items():
+        noid = values.get(field)
+        if noid is not None and (group_name, noid) not in existing:
+            return (group_name, noid)
+    return None
+
+
+async def _generate_customer_no(db: AsyncSession, customer_name: str | None) -> str:
+    if not customer_name:
+        raise ValueError("customer_no and customer_name are both missing; cannot generate customer_no")
+    prefix = customer_name.strip().upper()[:3]
+    if not prefix:
+        raise ValueError("customer_name is empty; cannot generate customer_no")
+
+    count = (
+        await db.execute(
+            select(func.count()).select_from(Customer).where(func.upper(Customer.customer_no).like(f"{prefix}%"))
+        )
+    ).scalar() or 0
+    return f"{prefix}{count + 1:04d}"
 
 
 class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
@@ -34,8 +64,7 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
     async def create(self, db: AsyncSession, obj_in: CustomerCreate) -> Customer:
         data = obj_in.model_dump()
         if not data.get("customer_no"):
-            count = (await db.execute(select(func.count()).select_from(Customer))).scalar() or 0
-            data["customer_no"] = f"CUST{count + 1:04d}"
+            data["customer_no"] = await _generate_customer_no(db, data.get("customer_name"))
         db_obj = Customer(**data)
         db.add(db_obj)
         await db.commit()
