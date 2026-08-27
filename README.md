@@ -120,6 +120,7 @@ alembic downgrade -1          # rollback one step
 - Migration 2 (`5c9ca3d9408d`): creates `system.group`, `inventory.item`, and `inventory.item_pricelist`.
 - Migration 3 (`63b865b5ada5`): renames `id` to `pricelist_id` in `inventory.item_pricelist`.
 - Migration 4 (`ed7260bbaf85`): creates `hr` and `sales` schemas and tables (`hr.employee`, `sales.sales_person`, `sales.customer`).
+- Migration 5 (`2781c4f12188`): adds `customer_top` (Terms of Payment) and its composite FK to `sales.customer`.
 - **Seeder Script (`scripts/seed_groups.py`)**: scans all group mappings across the application modules and idempotently populates `system.group` with required lookup values.
 
 ---
@@ -139,7 +140,7 @@ Interactive API documentation:
 ## 5. Database Design
 
 ### `system.group` — generic lookup table
-One physical table, partitioned logically by `group_name` (e.g. `SUB GROUP`, `BRAND GROUP`, `SERIES GROUP`, `PACK GROUP`, `ML GROUP`, `NIC GROUP`, `EMPLOYEE POSITION`, `EMPLOYEE DEPARTMENT`, `EMPLOYEE STATUS`, `SALES AREA`, `SALES LEVEL`, `CUSTOMER TYPE`, `CUSTOMER REGION`, `CUSTOMER STATUS`).
+One physical table, partitioned logically by `group_name` (e.g. `SUB GROUP`, `BRAND GROUP`, `SERIES GROUP`, `PACK GROUP`, `ML GROUP`, `NIC GROUP`, `EMPLOYEE POSITION`, `EMPLOYEE DEPARTMENT`, `EMPLOYEE STATUS`, `SALES AREA`, `SALES LEVEL`, `CUSTOMER TYPE`, `CUSTOMER REGION`, `CUSTOMER STATUS`, `CUSTOMER TOP`).
 
 | Column      | Type         | Constraints                                       |
 |-------------|--------------|---------------------------------------------------|
@@ -175,7 +176,7 @@ One physical table, partitioned logically by `group_name` (e.g. `SUB GROUP`, `BR
 ### HR & Sales Tables (`hr.employee`, `sales.sales_person`, `sales.customer`)
 - **`hr.employee`**: `employee_id`, `employee_no`, `employee_name`, `position`, `department`, `join_date`, `status`.
 - **`sales.sales_person`**: `sales_person_id`, `employee_id`, `sales_person_no`, `sales_area`, `sales_level`, `status`.
-- **`sales.customer`**: `customer_id`, `customer_no`, `customer_name`, `customer_type`, `sales_person_id`, `address`, `city_region`, `phone`, `status`.
+- **`sales.customer`**: `customer_id`, `customer_no`, `customer_name`, `customer_type`, `customer_top`, `sales_person_id`, `address`, `city_region`, `phone`, `status`.
 
 ---
 
