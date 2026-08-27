@@ -8,16 +8,20 @@ from app.schemas.group import GroupCreate, GroupUpdate
 group_crud = CRUDBase[Group, GroupCreate, GroupUpdate](Group)
 
 
-async def get_group_value(db: AsyncSession, group_name: str, group_noid: int | None) -> str:
+async def get_group_display(db: AsyncSession, group_name: str, group_noid: int | None) -> str:
     if group_noid is None:
         return ""
     result = await db.execute(
-        select(Group.group_value).where(Group.group_name == group_name, Group.group_noid == group_noid)
+        select(Group.group_display).where(Group.group_name == group_name, Group.group_noid == group_noid)
     )
     value = result.scalar_one_or_none()
     if value is None:
         raise ValueError(f"group '{group_name}' noid {group_noid} not found")
     return value
+
+
+async def get_group_value(db: AsyncSession, group_name: str, group_noid: int | None) -> str:
+    return await get_group_display(db, group_name, group_noid)
 
 
 async def populate_group_displays(db: AsyncSession, objects: list, mapping: dict[str, str]) -> None:
@@ -40,9 +44,9 @@ async def populate_group_displays(db: AsyncSession, objects: list, mapping: dict
         (Group.group_name == g_name) & (Group.group_noid == g_noid)
         for g_name, g_noid in pairs
     ]
-    stmt = select(Group.group_name, Group.group_noid, Group.group_value).where(or_(*conditions))
+    stmt = select(Group.group_name, Group.group_noid, Group.group_display).where(or_(*conditions))
     rows = (await db.execute(stmt)).all()
-    lookup = {(r.group_name, r.group_noid): r.group_value for r in rows}
+    lookup = {(r.group_name, r.group_noid): r.group_display for r in rows}
 
     for obj in objects:
         for attr, group_name in mapping.items():

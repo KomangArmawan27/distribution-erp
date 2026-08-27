@@ -47,7 +47,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             page = 1
 
         offset = (page - 1) * per_page
-        rows = (await db.execute(stmt.order_by(pk.desc()).offset(offset).limit(per_page))).scalars().all()
+        rows = (await db.execute(stmt.order_by(pk.desc()).offset(offset).limit(per_page))).unique().scalars().all()
 
         return compute_page_result(list(rows), page, per_page, total_items, total_pages)
 

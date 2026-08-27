@@ -2,18 +2,19 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 
-from app.routers import group, item, item_pricelist, employee, sales_person, customer
+from app.routers import group, item, item_pricelist, employee, sales_person, customer, sales_order
 from app.routers.group import router as group_router
 from app.routers.item import router as item_router
 from app.routers.item_pricelist import router as price_router
 from app.routers.employee import router as employee_router
 from app.routers.sales_person import router as sales_person_router
 from app.routers.customer import router as customer_router
+from app.routers.sales_order import router as sales_order_router
 from app.utils.response import APIError, error, meta, request_id
 
 load_dotenv()
 
-app = FastAPI(title="ERP Backend — Item Master", version="0.1.0")
+app = FastAPI(title="ERP Backend — Sales Order Module", version="0.1.0")
 
 
 @app.middleware("http")
@@ -38,9 +39,11 @@ async def api_error_exception_handler(request: Request, exc: APIError):
 async def unhandled_exception_handler(request: Request, exc: Exception):
     return error(request, status_code=500, code="INTERNAL_ERROR", message="An unexpected error occurred")
 
+
 @app.get("/health")
 async def health(request: Request):
     return {"status": "ok", "meta": meta(request)}
+
 
 app.include_router(group_router)
 app.include_router(item_router)
@@ -48,3 +51,4 @@ app.include_router(price_router)
 app.include_router(employee_router)
 app.include_router(sales_person_router)
 app.include_router(customer_router)
+app.include_router(sales_order_router)

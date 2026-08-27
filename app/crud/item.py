@@ -55,9 +55,9 @@ async def _build_item_name(db: AsyncSession, values: dict) -> str:
     parts: list[str] = []
     noids = {GROUP_LOOKUPS[f]: values.get(f) for f in GROUP_LOOKUPS if values.get(f) is not None}
     rows = (
-        await db.execute(select(Group.group_name, Group.group_noid, Group.group_value).where(Group.group_name.in_(noids)))
+        await db.execute(select(Group.group_name, Group.group_noid, Group.group_display).where(Group.group_name.in_(noids)))
     ).all()
-    lookup = {(g.group_name, g.group_noid): g.group_value for g in rows}
+    lookup = {(g.group_name, g.group_noid): g.group_display for g in rows}
     for field in NAME_ORDER:
         if field not in GROUP_LOOKUPS:
             part = values.get(field)

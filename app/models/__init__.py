@@ -4,5 +4,15 @@ from .item_pricelist import ItemPriceList
 from .employee import Employee
 from .sales_person import SalesPerson
 from .customer import Customer
+from .sales_order import OrderHeader, OrderDetail
 
-__all__ = ["Group", "Item", "ItemPriceList", "Employee", "SalesPerson", "Customer"]
+__all__ = [
+    "Group",
+    "Item",
+    "ItemPriceList",
+    "Employee",
+    "SalesPerson",
+    "Customer",
+    "OrderHeader",
+    "OrderDetail",
+]

@@ -1,4 +1,4 @@
-from sqlalchemy import SmallInteger, String, UniqueConstraint
+from sqlalchemy import Integer, SmallInteger, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.config.database import Base
@@ -11,4 +11,5 @@ class Group(Base):
     group_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     group_noid: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     group_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    group_value: Mapped[str] = mapped_column(String(100), nullable=False)
+    group_display: Mapped[str] = mapped_column(String(100), nullable=False)
+    group_value: Mapped[int | None] = mapped_column(Integer, nullable=True)
