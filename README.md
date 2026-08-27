@@ -1,6 +1,6 @@
 # ERP Backend — Item, HR, Sales, & Sales Order Modules
 
-Asynchronous FastAPI backend for the ERP system's **Item Master** (`inventory` schema), **HR & Sales** modules (`hr` and `sales` schemas), **Sales Order** module (`sales` schema), and supporting lookup tables (`system` schema).
+Asynchronous FastAPI backend for the ERP system's **Item Master** (`inventory` schema), **HR** (`hr` schema), **Sales** (`sales` schema), and supporting lookup tables (`system` schema).
 
 ---
 
@@ -71,21 +71,12 @@ distribution-erp/
 │       └── sales_order.py       # /sales-orders
 ├── alembic/
 │   ├── env.py                   # Loads DATABASE_URL_SYNC dynamically from settings
-│   └── versions/
-│       ├── 7c67a18f645e_create_inventory_and_system_schemas.py
-│       ├── 5c9ca3d9408d_create_group_item_item_pricelist_tables.py
-│       ├── 63b865b5ada5_rename_id_to_pricelist_id_in_item_.py
-│       ├── ed7260bbaf85_create_hr_and_sales_schemas_and_tables.py
-│       ├── 2781c4f12188_add_customer_top_to_sales_customer.py
-│       ├── 98a7b6c5d4e3_rename_group_value_to_group_display_and_add_integer_value.py
-│       └── 39a8b7c6d5e4_create_sales_order_tables.py
+│   └── versions/                # Alembic migration revisions
 ├── alembic.ini
 ├── requirements.txt
 ├── .env / .env.example
-├── sales order schema.md        # Sales Order module specs
-├── sales_master.md              # Sales & HR master schema specs
-├── pagination.md                # API response & pagination standard
-├── error_handling.md            # Error handling standard & code registry
+├── customer_top.md              # Customer Terms of Payment module specs
+├── sales_order_schema.md        # Sales Order module specs
 └── README.md
 ```
 
@@ -101,7 +92,7 @@ pip install -r requirements.txt
 
 ### Environment — `.env`
 
-Copy `.env.example` to `.env` and set credentials. Both URL lines must match your real user/password:
+Copy `.env.example` to `.env` and set credentials:
 
 ```env
 POSTGRES_USER=user
@@ -120,7 +111,7 @@ APP_ENV=development
 
 ```bash
 alembic upgrade head          # creates schemas + tables & applies all migrations
-python scripts/seed_groups.py # populates system lookup groups (Item Master, Employee, Customer, Sales Person, Customer TOP with day offsets)
+python scripts/seed_groups.py # populates system lookup groups
 alembic downgrade -1          # rollback one step
 ```
 
@@ -131,7 +122,7 @@ alembic downgrade -1          # rollback one step
 - Migration 5 (`2781c4f12188`): adds `customer_top` and composite FK to `sales.customer`.
 - Migration 6 (`98a7b6c5d4e3`): renames `system.group.group_value` to `group_display` and adds integer `group_value` for day-offset calculations.
 - Migration 7 (`39a8b7c6d5e4`): creates `sales.order_header` and `sales.order_detail`.
-- **Seeder Script (`scripts/seed_groups.py`)**: scans all group mappings across application modules and idempotently populates `system.group` with display text and integer day-offset values.
+- **Seeder Script (`scripts/seed_groups.py`)**: scans group mappings and idempotently populates `system.group` with display labels and integer day-offset values.
 
 ---
 
@@ -154,25 +145,112 @@ One physical table, partitioned logically by `group_name`.
 
 | Column          | Type         | Constraints / Notes                                        |
 |-----------------|--------------|------------------------------------------------------------|
-| group_id        | SERIAL       | Primary key                                                |
+| group_id        | SERIAL       | Primary key, autoincrement                                 |
 | group_noid      | SMALLINT     | Not null, unique within a `group_name`                     |
 | group_name      | VARCHAR(50)  | Not null, lookup category                                  |
 | group_display   | VARCHAR(100) | Not null, display text (e.g. `NET 15`, `ACTIVE`, `STAFF`)  |
 | group_value     | INTEGER      | Nullable, integer value / day-offset (e.g. `15` for NET 15)|
 
-### `inventory.item` & `inventory.item_pricelist`
-- Item Master and Pricelist tables as documented previously.
+### `inventory.item` — Item Master
+Item master data.
 
-### HR, Sales, & Sales Order Tables (`hr.employee`, `sales.sales_person`, `sales.customer`, `sales.order_header`, `sales.order_detail`)
-- **`hr.employee`**: `employee_id`, `employee_no`, `employee_name`, `position`, `department`, `join_date`, `status`.
-- **`sales.sales_person`**: `sales_person_id`, `employee_id`, `sales_person_no`, `sales_area`, `sales_level`, `status`.
-- **`sales.customer`**: `customer_id`, `customer_no`, `customer_name`, `customer_type`, `customer_top`, `sales_person_id`, `address`, `city_region`, `phone`, `status`.
-- **`sales.order_header`**: `doc_id`, `doc_no` (`SOYYMM0001`), `doc_date`, `doc_duedate` (auto-calculated from `doc_terms` day-offset), `doc_terms` (FK to `CUSTOMER TOP`), `cust_id`, `dropship_id`, `sales_id`.
-- **`sales.order_detail`**: `trans_id`, `doc_id`, `trans_idx` (sequential per order), `item_id`, `trans_qty` (> 0), `trans_price`, `trans_total` (`qty * price`), unique on `(doc_id, item_id)`.
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| item_id         | SERIAL       | Primary key, autoincrement                                 |
+| item_no         | VARCHAR(50)  | Not null, unique SKU / item number                         |
+| item_name       | VARCHAR(255) | Not null, derived item description                         |
+| sub_group       | SMALLINT     | Nullable, FK reference to `system.group` (`SUB GROUP`)     |
+| brand_group     | SMALLINT     | Nullable, FK reference to `system.group` (`BRAND GROUP`)   |
+| series_group    | SMALLINT     | Nullable, FK reference to `system.group` (`SERIES GROUP`)  |
+| flavour_group   | VARCHAR(100) | Nullable, flavour specification                            |
+| pack_group      | SMALLINT     | Nullable, FK reference to `system.group` (`PACK GROUP`)    |
+| ml_group        | SMALLINT     | Nullable, FK reference to `system.group` (`ML GROUP`)      |
+| nic_group       | SMALLINT     | Nullable, FK reference to `system.group` (`NIC GROUP`)     |
+| item_year       | INTEGER      | Nullable, item release year                                |
+
+### `inventory.item_pricelist` — Item Pricelist
+Pricelist records per item.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| pricelist_id    | SERIAL       | Primary key, autoincrement                                 |
+| item_id         | INTEGER      | FK -> `inventory.item(item_id)` (on delete CASCADE), unique|
+| item_price_ms   | NUMERIC(12,2)| Not null, Modern Market / MS price                         |
+| item_price_ws   | NUMERIC(12,2)| Not null, Wholesale / WS price                             |
+| item_price_distri| NUMERIC(12,2)| Not null, Distributor price                               |
+
+### `hr.employee` — HR Employee Table
+Employee records.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| employee_id     | SERIAL       | Primary key, autoincrement                                 |
+| employee_no     | VARCHAR(50)  | Not null, unique employee number                           |
+| employee_name   | VARCHAR(255) | Not null, employee full name                               |
+| position        | SMALLINT     | Nullable, FK reference to `system.group` (`POSITION`)      |
+| department      | SMALLINT     | Nullable, FK reference to `system.group` (`DEPARTMENT`)    |
+| join_date       | DATE         | Nullable, employee join date                               |
+| status          | SMALLINT     | Nullable, FK reference to `system.group` (`STATUS`)        |
+
+### `sales.sales_person` — Sales Person Table
+Sales personnel mapping to employees.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| sales_person_id | SERIAL       | Primary key, autoincrement                                 |
+| employee_id     | INTEGER      | FK -> `hr.employee(employee_id)` (on delete CASCADE), not null|
+| sales_person_no | VARCHAR(50)  | Not null, unique sales person number                       |
+| sales_area      | SMALLINT     | Nullable, FK reference to `system.group` (`SALES AREA`)    |
+| sales_level     | SMALLINT     | Nullable, FK reference to `system.group` (`SALES LEVEL`)   |
+| status          | SMALLINT     | Nullable, FK reference to `system.group` (`STATUS`)        |
+
+### `sales.customer` — Customer Table
+Customer master records.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| customer_id     | SERIAL       | Primary key, autoincrement                                 |
+| customer_no     | VARCHAR(50)  | Not null, unique customer number                           |
+| customer_name   | VARCHAR(255) | Not null, customer company/name                            |
+| customer_type   | SMALLINT     | Nullable, FK reference to `system.group` (`CUSTOMER TYPE`) |
+| customer_top    | SMALLINT     | Nullable, FK reference to `system.group` (`CUSTOMER TOP`)  |
+| sales_person_id | INTEGER      | FK -> `sales.sales_person(sales_person_id)` (on delete SET NULL), nullable |
+| address         | VARCHAR(500) | Nullable, customer address                                 |
+| city_region     | SMALLINT     | Nullable, FK reference to `system.group` (`CITY REGION`)   |
+| phone           | VARCHAR(50)  | Nullable, customer phone number                            |
+| status          | SMALLINT     | Nullable, FK reference to `system.group` (`STATUS`)        |
+
+### `sales.order_header` — Sales Order Header
+Sales order document headers.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| doc_id          | SERIAL       | Primary key, autoincrement                                 |
+| doc_no          | VARCHAR(50)  | Not null, unique document number (`SOYYMM0001`)            |
+| doc_date        | DATE         | Not null, order date                                       |
+| doc_duedate     | DATE         | Not null, auto-calculated payment due date (day-offset)    |
+| doc_terms       | SMALLINT     | Not null, FK reference to `system.group` (`CUSTOMER TOP`)  |
+| cust_id         | INTEGER      | FK -> `sales.customer(customer_id)` (on delete RESTRICT), not null |
+| dropship_id     | INTEGER      | FK -> `sales.customer(customer_id)` (on delete SET NULL), nullable |
+| sales_id        | INTEGER      | FK -> `sales.sales_person(sales_person_id)` (on delete SET NULL), nullable |
+
+### `sales.order_detail` — Sales Order Detail
+Sales order line items.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| trans_id        | SERIAL       | Primary key, autoincrement                                 |
+| doc_id          | INTEGER      | FK -> `sales.order_header(doc_id)` (on delete CASCADE), not null |
+| trans_idx       | INTEGER      | Not null, line sequence number per order                   |
+| item_id         | INTEGER      | FK -> `inventory.item(item_id)` (on delete RESTRICT), not null |
+| trans_qty       | INTEGER      | Not null, transaction quantity (`> 0`)                     |
+| trans_price     | NUMERIC(15,2)| Not null, unit price snapshot                              |
+| trans_total     | NUMERIC(15,2)| Not null, line total (`trans_qty * trans_price`)           |
 
 ---
 
 ## 6. Group Display Lookups (`*_display`)
+
 All GET endpoints automatically batch-resolve foreign-key group `noid` references from `system.group` into corresponding `*_display` fields (e.g. `doc_terms_display`, `position_display`, `customer_top_display`, etc.).
 
 ---
