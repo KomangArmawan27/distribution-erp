@@ -108,10 +108,11 @@ DATABASE_URL_SYNC=postgresql+psycopg2://komang:damedane098@localhost:5432/erp_db
 APP_ENV=development
 ```
 
-### Migrations
+### Migrations & Seeding
 
 ```bash
 alembic upgrade head          # creates schemas + tables & applies all migrations
+python scripts/seed_groups.py # populates system lookup groups (Item Master, Employee, Customer, Sales Person)
 alembic downgrade -1          # rollback one step
 ```
 
@@ -119,6 +120,7 @@ alembic downgrade -1          # rollback one step
 - Migration 2 (`5c9ca3d9408d`): creates `system.group`, `inventory.item`, and `inventory.item_pricelist`.
 - Migration 3 (`63b865b5ada5`): renames `id` to `pricelist_id` in `inventory.item_pricelist`.
 - Migration 4 (`ed7260bbaf85`): creates `hr` and `sales` schemas and tables (`hr.employee`, `sales.sales_person`, `sales.customer`).
+- **Seeder Script (`scripts/seed_groups.py`)**: scans all group mappings across the application modules and idempotently populates `system.group` with required lookup values.
 
 ---
 
