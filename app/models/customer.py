@@ -16,6 +16,7 @@ class Customer(Base):
     customer_no: Mapped[str] = mapped_column(String(50), nullable=False)
     customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
     customer_type: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    customer_top: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     sales_person_id: Mapped[int | None] = mapped_column(
         ForeignKey("sales.sales_person.sales_person_id", ondelete="SET NULL"), nullable=True
     )

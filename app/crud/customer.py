@@ -8,6 +8,7 @@ from app.schemas.customer import CustomerCreate, CustomerUpdate
 
 CUSTOMER_GROUP_MAPPING = {
     "customer_type": "CUSTOMER TYPE",
+    "customer_top": "CUSTOMER TOP",
     "city_region": "CUSTOMER REGION",
     "status": "CUSTOMER STATUS",
 }

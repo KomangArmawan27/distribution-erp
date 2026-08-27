@@ -43,6 +43,10 @@ INITIAL_GROUPS = [
     ("CUSTOMER REGION", 3, "CENTRAL"),
     ("CUSTOMER STATUS", 1, "ACTIVE"),
     ("CUSTOMER STATUS", 2, "INACTIVE"),
+    ("CUSTOMER TOP", 1, "COD"),
+    ("CUSTOMER TOP", 2, "CBD"),
+    ("CUSTOMER TOP", 3, "NET 15"),
+    ("CUSTOMER TOP", 4, "NET 30"),
 
     # --- Sales Person Groups ---
     ("SALES AREA", 1, "JAKARTA"),
