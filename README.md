@@ -104,14 +104,14 @@ pip install -r requirements.txt
 Copy `.env.example` to `.env` and set credentials. Both URL lines must match your real user/password:
 
 ```env
-POSTGRES_USER=komang
-POSTGRES_PASSWORD=damedane098
+POSTGRES_USER=user
+POSTGRES_PASSWORD=password
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=erp_db
 
-DATABASE_URL=postgresql+asyncpg://komang:damedane098@localhost:5432/erp_db
-DATABASE_URL_SYNC=postgresql+psycopg2://komang:damedane098@localhost:5432/erp_db
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/erp_db
+DATABASE_URL_SYNC=postgresql+psycopg2://user:password@localhost:5432/erp_db
 
 APP_ENV=development
 ```
