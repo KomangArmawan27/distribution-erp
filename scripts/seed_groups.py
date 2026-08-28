@@ -5,8 +5,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select
-from app.config.database import AsyncSessionLocal
-from app.models import Group
+from app.core.database import AsyncSessionLocal
+from app.modules.group.models import Group
 
 # (group_name, group_noid, group_display, group_value_int)
 INITIAL_GROUPS = [
