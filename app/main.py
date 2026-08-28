@@ -2,15 +2,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 
-from app.routers import group, item, item_pricelist, employee, sales_person, customer, sales_order
-from app.routers.group import router as group_router
-from app.routers.item import router as item_router
-from app.routers.item_pricelist import router as price_router
-from app.routers.employee import router as employee_router
-from app.routers.sales_person import router as sales_person_router
-from app.routers.customer import router as customer_router
-from app.routers.sales_order import router as sales_order_router
-from app.utils.response import APIError, error, meta, request_id
+from app.modules.group.router import router as group_router
+from app.modules.item.router import router as item_router
+from app.modules.item_pricelist.router import router as price_router
+from app.modules.employee.router import router as employee_router
+from app.modules.sales_person.router import router as sales_person_router
+from app.modules.customer.router import router as customer_router
+from app.modules.sales_order.router import router as sales_order_router
+from app.core.response import APIError, error, meta, request_id
 
 load_dotenv()
 

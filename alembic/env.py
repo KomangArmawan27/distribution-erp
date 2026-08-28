@@ -5,9 +5,15 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from app.config.settings import settings
-from app.config.database import Base
-from app.models import group, item, item_pricelist, employee, sales_person, customer  # noqa: F401  (populate metadata)
+from app.core.config import settings
+from app.core.database import Base
+from app.modules.group import models as group_model  # noqa: F401
+from app.modules.item import models as item_model  # noqa: F401
+from app.modules.item_pricelist import models as pricelist_model  # noqa: F401
+from app.modules.employee import models as employee_model  # noqa: F401
+from app.modules.sales_person import models as sales_person_model  # noqa: F401
+from app.modules.customer import models as customer_model  # noqa: F401
+from app.modules.sales_order import models as sales_order_model  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

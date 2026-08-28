@@ -1,0 +1,68 @@
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.base_crud import CRUDBase, PageResult
+from app.modules.group.crud import populate_group_displays
+from app.modules.group.models import Group
+from app.modules.employee.models import Employee
+from app.modules.employee.schemas import EmployeeCreate, EmployeeUpdate
+
+EMPLOYEE_GROUP_MAPPING = {
+    "position": "EMPLOYEE POSITION",
+    "department": "EMPLOYEE DEPARTMENT",
+    "status": "EMPLOYEE STATUS",
+}
+
+
+async def find_missing_group(db: AsyncSession, values: dict) -> tuple[str, int] | None:
+    noids = {EMPLOYEE_GROUP_MAPPING[f]: values.get(f) for f in EMPLOYEE_GROUP_MAPPING if values.get(f) is not None}
+    if not noids:
+        return None
+    rows = (
+        await db.execute(select(Group.group_name, Group.group_noid).where(Group.group_name.in_(noids)))
+    ).all()
+    existing = {(g.group_name, g.group_noid) for g in rows}
+    for field, group_name in EMPLOYEE_GROUP_MAPPING.items():
+        noid = values.get(field)
+        if noid is not None and (group_name, noid) not in existing:
+            return (group_name, noid)
+    return None
+
+
+class CRUDEmployee(CRUDBase[Employee, EmployeeCreate, EmployeeUpdate]):
+    async def get(self, db: AsyncSession, id_: int) -> Employee | None:
+        obj = await super().get(db, id_)
+        if obj:
+            await populate_group_displays(db, [obj], EMPLOYEE_GROUP_MAPPING)
+        return obj
+
+    async def page(
+        self,
+        db: AsyncSession,
+        page: int = 1,
+        per_page: int = 20,
+        extra_filter=None,
+    ) -> PageResult:
+        page_result = await super().page(db, page=page, per_page=per_page, extra_filter=extra_filter)
+        await populate_group_displays(db, page_result.items, EMPLOYEE_GROUP_MAPPING)
+        return page_result
+
+    async def create(self, db: AsyncSession, obj_in: EmployeeCreate) -> Employee:
+        data = obj_in.model_dump()
+        if not data.get("employee_no"):
+            count = (await db.execute(select(func.count()).select_from(Employee))).scalar() or 0
+            data["employee_no"] = f"EMP{count + 1:04d}"
+        db_obj = Employee(**data)
+        db.add(db_obj)
+        await db.commit()
+        await db.refresh(db_obj)
+        await populate_group_displays(db, [db_obj], EMPLOYEE_GROUP_MAPPING)
+        return db_obj
+
+    async def update(self, db: AsyncSession, db_obj: Employee, obj_in: EmployeeUpdate) -> Employee:
+        obj = await super().update(db, db_obj, obj_in)
+        await populate_group_displays(db, [obj], EMPLOYEE_GROUP_MAPPING)
+        return obj
+
+
+employee_crud = CRUDEmployee(Employee)

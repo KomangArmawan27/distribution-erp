@@ -22,53 +22,24 @@ Asynchronous FastAPI backend for the ERP system's **Item Master** (`inventory` s
 ## 2. Project Structure
 
 ```
-distribution-erp/
+idj-erp-be/
 ├── app/
 │   ├── main.py                  # FastAPI entrypoint, middleware, exception handlers
-│   ├── config/
-│   │   ├── settings.py          # Settings (reads .env)
-│   │   └── database.py          # Async engine, AsyncSessionLocal, Base, get_db
-│   ├── models/                  # SQLAlchemy ORM models
-│   │   ├── __init__.py          # Re-exports all models
-│   │   ├── group.py             # system.group
-│   │   ├── item.py              # inventory.item
-│   │   ├── item_pricelist.py    # inventory.item_pricelist
-│   │   ├── employee.py          # hr.employee
-│   │   ├── sales_person.py      # sales.sales_person
-│   │   ├── customer.py          # sales.customer
-│   │   └── sales_order.py       # sales.order_header & sales.order_detail
-│   ├── schemas/                 # Pydantic request/response models
-│   │   ├── __init__.py
+│   ├── core/                    # Shared core infrastructure & utilities
+│   │   ├── config.py            # Settings (reads .env)
+│   │   ├── database.py          # Async engine, AsyncSessionLocal, Base, get_db
+│   │   ├── base_crud.py         # Generic CRUD base (incl. page/offset pagination & .unique())
 │   │   ├── envelope.py          # Envelope[T], PaginationModel, LinksModel, ErrorModel, MetaModel
-│   │   ├── group.py             # GroupCreate / GroupUpdate / GroupRead
-│   │   ├── item.py              # ItemCreate / ItemUpdate / ItemRead (+ group display fields)
-│   │   ├── item_pricelist.py    # ItemPriceListCreate / Update / Read
-│   │   ├── employee.py          # EmployeeCreate / Update / Read
-│   │   ├── sales_person.py      # SalesPersonCreate / Update / Read
-│   │   ├── customer.py          # CustomerCreate / Update / Read
-│   │   └── sales_order.py       # OrderHeaderCreate / Update / Read & OrderDetail schemas
-│   ├── crud/
-│   │   ├── __init__.py
-│   │   ├── base.py              # Generic CRUD base (incl. page/offset pagination & .unique())
-│   │   ├── group.py             # group_crud instance + get_group_display & populate_group_displays
-│   │   ├── item.py              # CRUDItem: SKU generation, item_name derivation, group lookup population
-│   │   ├── item_pricelist.py    # item_pricelist_crud instance
-│   │   ├── employee.py          # employee_crud instance + group display population
-│   │   ├── sales_person.py      # sales_person_crud instance + group display population
-│   │   ├── customer.py          # customer_crud instance + group display population
-│   │   └── sales_order.py       # sales_order_crud instance (doc_no generation, doc_duedate calculation)
-│   ├── utils/
 │   │   ├── pagination.py        # PageResult, compute_page_result, build_links, pagination_dict
 │   │   └── response.py          # APIError, success(), error(), meta(), request_id()
-│   └── routers/                 # REST endpoints
-│       ├── __init__.py
-│       ├── group.py             # /groups
-│       ├── item.py              # /items
-│       ├── item_pricelist.py    # /item-pricelist
-│       ├── employee.py          # /employees
-│       ├── sales_person.py      # /sales-persons
-│       ├── customer.py          # /customers
-│       └── sales_order.py       # /sales-orders
+│   └── modules/                 # Domain-based feature modules
+│       ├── group/               # system.group (models, schemas, crud, router)
+│       ├── item/                # inventory.item (models, schemas, crud, router)
+│       ├── item_pricelist/      # inventory.item_pricelist (models, schemas, crud, router)
+│       ├── employee/            # hr.employee (models, schemas, crud, router)
+│       ├── sales_person/        # sales.sales_person (models, schemas, crud, router)
+│       ├── customer/            # sales.customer (models, schemas, crud, router)
+│       └── sales_order/         # sales.order_header & order_detail (models, schemas, crud, router)
 ├── alembic/
 │   ├── env.py                   # Loads DATABASE_URL_SYNC dynamically from settings
 │   └── versions/                # Alembic migration revisions

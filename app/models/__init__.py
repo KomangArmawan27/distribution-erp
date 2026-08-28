@@ -1,10 +1,10 @@
-from .group import Group
-from .item import Item
-from .item_pricelist import ItemPriceList
-from .employee import Employee
-from .sales_person import SalesPerson
-from .customer import Customer
-from .sales_order import OrderHeader, OrderDetail
+from app.modules.group.models import Group
+from app.modules.item.models import Item
+from app.modules.item_pricelist.models import ItemPriceList
+from app.modules.employee.models import Employee
+from app.modules.sales_person.models import SalesPerson
+from app.modules.customer.models import Customer
+from app.modules.sales_order.models import OrderHeader, OrderDetail
 
 __all__ = [
     "Group",
