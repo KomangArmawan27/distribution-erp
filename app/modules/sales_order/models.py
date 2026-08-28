@@ -61,3 +61,11 @@ class OrderDetail(Base):
 
     header: Mapped["OrderHeader"] = relationship("OrderHeader", back_populates="details")
     item: Mapped["Item"] = relationship("Item", foreign_keys=[item_id], lazy="joined")
+
+    @property
+    def item_no(self) -> str | None:
+        return self.item.item_no if self.item else None
+
+    @property
+    def item_desc(self) -> str | None:
+        return self.item.item_name if self.item else None

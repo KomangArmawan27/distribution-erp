@@ -2,9 +2,11 @@ from datetime import date, timedelta
 from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.core.base_crud import CRUDBase, PageResult
 from app.modules.group.crud import populate_group_displays
+from app.core.pagination import compute_page_result
 from app.modules.group.models import Group
 from app.modules.sales_order.models import OrderHeader, OrderDetail
 from app.modules.sales_order.schemas import OrderHeaderCreate, OrderHeaderUpdate
@@ -39,7 +41,11 @@ async def _get_doc_duedate(db: AsyncSession, doc_date: date, doc_terms: int) -> 
 
 class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]):
     async def get(self, db: AsyncSession, id_: int) -> OrderHeader | None:
-        obj = await super().get(db, id_)
+        stmt = select(self.model).options(
+            selectinload(self.model.details).joinedload(OrderDetail.item)
+        ).where(self.pk_column == id_)
+        result = await db.execute(stmt)
+        obj = result.scalar_one_or_none()
         if obj:
             await populate_group_displays(db, [obj], ORDER_HEADER_GROUP_MAPPING)
         return obj
@@ -51,7 +57,27 @@ class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]
         per_page: int = 20,
         extra_filter=None,
     ) -> PageResult:
-        page_result = await super().page(db, page=page, per_page=per_page, extra_filter=extra_filter)
+        pk = self.pk_column
+        stmt = select(self.model).options(
+            selectinload(self.model.details).joinedload(OrderDetail.item)
+        )
+        count_stmt = select(func.count()).select_from(self.model)
+        if extra_filter is not None:
+            stmt = stmt.where(extra_filter)
+            count_stmt = count_stmt.where(extra_filter)
+
+        total_items = (await db.execute(count_stmt)).scalar() or 0
+        total_pages = max((total_items + per_page - 1) // per_page, 0) if per_page else 0
+
+        if page > total_pages and total_pages > 0:
+            page = total_pages
+        if page < 1:
+            page = 1
+
+        offset = (page - 1) * per_page
+        rows = (await db.execute(stmt.order_by(pk.desc()).offset(offset).limit(per_page))).unique().scalars().all()
+
+        page_result = compute_page_result(list(rows), page, per_page, total_items, total_pages)
         await populate_group_displays(db, page_result.items, ORDER_HEADER_GROUP_MAPPING)
         return page_result
 
@@ -88,8 +114,7 @@ class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]
 
         await db.commit()
         await db.refresh(header)
-        await populate_group_displays(db, [header], ORDER_HEADER_GROUP_MAPPING)
-        return header
+        return await self.get(db, header.doc_id)
 
     async def update(self, db: AsyncSession, db_obj: OrderHeader, obj_in: OrderHeaderUpdate) -> OrderHeader:
         data = obj_in.model_dump(exclude_unset=True)
@@ -124,8 +149,7 @@ class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]
 
         await db.commit()
         await db.refresh(db_obj)
-        await populate_group_displays(db, [db_obj], ORDER_HEADER_GROUP_MAPPING)
-        return db_obj
+        return await self.get(db, db_obj.doc_id)
 
 
 sales_order_crud = CRUDSalesOrder(OrderHeader)

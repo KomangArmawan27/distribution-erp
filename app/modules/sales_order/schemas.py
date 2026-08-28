@@ -22,6 +22,8 @@ class OrderDetailRead(BaseModel):
     doc_id: int
     trans_idx: int
     item_id: int
+    item_no: str | None = None
+    item_desc: str | None = None
     trans_qty: int
     trans_price: Decimal
     trans_total: Decimal
