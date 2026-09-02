@@ -1,6 +1,6 @@
-# ERP Backend — Item, HR, Sales, & Sales Order Modules
+# ERP Backend — Item, HR, Sales, Sales Order & Workflow State Modules
 
-Asynchronous FastAPI backend for the ERP system's **Item Master** (`inventory` schema), **HR** (`hr` schema), **Sales** (`sales` schema), and supporting lookup tables (`system` schema).
+Asynchronous FastAPI backend for the ERP system's **Item Master** (`inventory` schema), **HR** (`hr` schema), **Sales** (`sales` schema), **Document Workflow State System** (`system` schema), and supporting lookup tables.
 
 ---
 
@@ -34,12 +34,13 @@ idj-erp-be/
 │   │   └── response.py          # APIError, success(), error(), meta(), request_id()
 │   └── modules/                 # Domain-based feature modules
 │       ├── group/               # system.group (models, schemas, crud, router)
+│       ├── system/              # system.document_type, flow_state, flow_transition (models, schemas, crud, router)
 │       ├── item/                # inventory.item (models, schemas, crud, router)
 │       ├── item_pricelist/      # inventory.item_pricelist (models, schemas, crud, router)
 │       ├── employee/            # hr.employee (models, schemas, crud, router)
 │       ├── sales_person/        # sales.sales_person (models, schemas, crud, router)
 │       ├── customer/            # sales.customer (models, schemas, crud, router)
-│       └── sales_order/         # sales.order_header & order_detail (models, schemas, crud, router)
+│       └── sales_order/         # sales.order_header & order_detail + state transition (models, schemas, crud, router)
 ├── alembic/
 │   ├── env.py                   # Loads DATABASE_URL_SYNC dynamically from settings
 │   └── versions/                # Alembic migration revisions
@@ -48,6 +49,7 @@ idj-erp-be/
 ├── .env / .env.example
 ├── customer_top.md              # Customer Terms of Payment module specs
 ├── sales_order_schema.md        # Sales Order module specs
+├── flow_state.md                # Document Flow-State System specs
 └── README.md
 ```
 
@@ -82,7 +84,7 @@ APP_ENV=development
 
 ```bash
 alembic upgrade head          # creates schemas + tables & applies all migrations
-python scripts/seed_groups.py # populates system lookup groups
+python scripts/seed_all.py    # populates master data (groups and doctypes/flows)
 alembic downgrade -1          # rollback one step
 ```
 
@@ -93,7 +95,8 @@ alembic downgrade -1          # rollback one step
 - Migration 5 (`2781c4f12188`): adds `customer_top` and composite FK to `sales.customer`.
 - Migration 6 (`98a7b6c5d4e3`): renames `system.group.group_value` to `group_display` and adds integer `group_value` for day-offset calculations.
 - Migration 7 (`39a8b7c6d5e4`): creates `sales.order_header` and `sales.order_detail`.
-- **Seeder Script (`scripts/seed_groups.py`)**: scans group mappings and idempotently populates `system.group` with display labels and integer day-offset values.
+- Migration 8 (`40b9c8d7e6f5`): creates `system.document_type`, `system.flow_state`, and `system.flow_transition`, and alters `sales.order_header` (`doctype_id`, `doc_state`, constraints, and foreign key).
+- **Seeder Scripts (`scripts/seed_groups.py`, `scripts/seed_doctypes.py`)**: idempotently populates lookup groups, document types, flow states, and transitions.
 
 ---
 
@@ -121,6 +124,37 @@ One physical table, partitioned logically by `group_name`.
 | group_name      | VARCHAR(50)  | Not null, lookup category                                  |
 | group_display   | VARCHAR(100) | Not null, display text (e.g. `NET 15`, `ACTIVE`, `STAFF`)  |
 | group_value     | INTEGER      | Nullable, integer value / day-offset (e.g. `15` for NET 15)|
+
+### `system.document_type` — Document Type Registry
+Registry of ERP modules / document types.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| doctype_id      | SMALLSERIAL  | Primary key                                                |
+| doctype_code    | VARCHAR(30)  | Not null, unique (e.g. `SALES_ORDER`)                      |
+| doctype_name    | VARCHAR(100) | Not null, human-readable name                              |
+
+### `system.flow_state` — Flow States
+Per-doctype valid states.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| flow_id         | SERIAL       | Primary key                                                |
+| doctype_id      | SMALLINT     | FK -> `system.document_type(doctype_id)`                   |
+| docflow_seq     | SMALLINT     | Not null, unique with `doctype_id`                         |
+| flow_state      | VARCHAR(50)  | Not null, label (e.g. `New Entry`, `Approved`)             |
+
+### `system.flow_transition` — Flow Transitions (Graph Edges)
+Legal state transitions and ACL hooks per doctype.
+
+| Column          | Type         | Constraints / Notes                                        |
+|-----------------|--------------|------------------------------------------------------------|
+| transition_id   | SERIAL       | Primary key                                                |
+| doctype_id      | SMALLINT     | FK -> `system.document_type(doctype_id)`                   |
+| from_seq        | SMALLINT     | Composite FK -> `flow_state(doctype_id, docflow_seq)`      |
+| to_seq          | SMALLINT     | Composite FK -> `flow_state(doctype_id, docflow_seq)`      |
+| action_label    | VARCHAR(50)  | Not null, e.g. `Approve`, `Reject`                         |
+| min_role        | SMALLINT     | Default `1`, minimum role level required                   |
 
 ### `inventory.item` — Item Master
 Item master data.
@@ -201,6 +235,8 @@ Sales order document headers.
 | doc_date        | DATE         | Not null, order date                                       |
 | doc_duedate     | DATE         | Not null, auto-calculated payment due date (day-offset)    |
 | doc_terms       | SMALLINT     | Not null, FK reference to `system.group` (`CUSTOMER TOP`)  |
+| doctype_id      | SMALLINT     | Not null, fixed to `1` (`SALES_ORDER`)                     |
+| doc_state       | SMALLINT     | Not null, FK -> `system.flow_state(doctype_id, docflow_seq)`|
 | cust_id         | INTEGER      | FK -> `sales.customer(customer_id)` (on delete RESTRICT), not null |
 | dropship_id     | INTEGER      | FK -> `sales.customer(customer_id)` (on delete SET NULL), nullable |
 | sales_id        | INTEGER      | FK -> `sales.sales_person(sales_person_id)` (on delete SET NULL), nullable |
@@ -220,9 +256,9 @@ Sales order line items.
 
 ---
 
-## 6. Group Display Lookups (`*_display`)
+## 6. Display Resolution (`*_display`)
 
-All GET endpoints automatically batch-resolve foreign-key group `noid` references from `system.group` into corresponding `*_display` fields (e.g. `doc_terms_display`, `position_display`, `customer_top_display`, etc.).
+All GET endpoints automatically batch-resolve foreign-key group `noid` references from `system.group` into corresponding `*_display` fields (e.g. `doc_terms_display`, `position_display`, `customer_top_display`, etc.) and flow state references into `doc_state_display`.
 
 ---
 
@@ -236,6 +272,21 @@ All GET endpoints automatically batch-resolve foreign-key group `noid` reference
 | GET    | `/groups/{group_id}`         | Get group by ID                                        |
 | PUT    | `/groups/{group_id}`         | Update group                                           |
 | DELETE | `/groups/{group_id}`         | Delete group                                           |
+| GET    | `/document-types/`           | List document types                                    |
+| POST   | `/document-types/`           | Create document type                                   |
+| GET    | `/document-types/{id}`       | Get document type by ID                                |
+| PUT    | `/document-types/{id}`       | Update document type                                   |
+| DELETE | `/document-types/{id}`       | Delete document type (with reference check)            |
+| GET    | `/flow-states/`              | List flow states (supports `?doctype_id=`)             |
+| POST   | `/flow-states/`              | Create flow state                                      |
+| GET    | `/flow-states/{id}`          | Get flow state by ID                                   |
+| PUT    | `/flow-states/{id}`          | Update flow state                                      |
+| DELETE | `/flow-states/{id}`          | Delete flow state (with reference check)               |
+| GET    | `/flow-transitions/`         | List flow transitions (supports `?doctype_id=`)        |
+| POST   | `/flow-transitions/`         | Create flow transition                                 |
+| GET    | `/flow-transitions/{id}`     | Get flow transition by ID                              |
+| PUT    | `/flow-transitions/{id}`     | Update flow transition                                 |
+| DELETE | `/flow-transitions/{id}`     | Delete flow transition                                 |
 | GET    | `/items/`                    | List items (paginated, with group displays)            |
 | POST   | `/items/`                    | Create item (auto SKU & derived name)                  |
 | GET    | `/items/{item_id}`           | Get item by ID                                         |
@@ -246,23 +297,24 @@ All GET endpoints automatically batch-resolve foreign-key group `noid` reference
 | GET    | `/item-pricelist/{pricelist_id}` | Get price record by ID                             |
 | PUT    | `/item-pricelist/{pricelist_id}` | Update price record                                |
 | DELETE | `/item-pricelist/{pricelist_id}` | Delete price record                                |
-| GET    | `/employees/`                | List employees (paginated, with group displays)        |
+| GET    | `/employees/`                | Employee list (paginated, group displays)              |
 | POST   | `/employees/`                | Create employee                                        |
 | GET    | `/employees/{employee_id}`   | Get employee by ID                                     |
 | PUT    | `/employees/{employee_id}`   | Update employee                                        |
 | DELETE | `/employees/{employee_id}`   | Delete employee                                        |
-| GET    | `/sales-persons/`            | List sales persons (paginated, with group displays)    |
+| GET    | `/sales-persons/`            | Sales persons list (paginated, group displays)         |
 | POST   | `/sales-persons/`            | Create sales person                                    |
 | GET    | `/sales-persons/{sales_person_id}` | Get sales person by ID                           |
 | PUT    | `/sales-persons/{sales_person_id}` | Update sales person                            |
 | DELETE | `/sales-persons/{sales_person_id}` | Delete sales person                            |
-| GET    | `/customers/`                | List customers (paginated, with group displays)        |
+| GET    | `/customers/`                | Customer list (paginated, group displays)              |
 | POST   | `/customers/`                | Create customer                                        |
 | GET    | `/customers/{customer_id}`   | Get customer by ID                                     |
 | PUT    | `/customers/{customer_id}`   | Update customer                                        |
 | DELETE | `/customers/{customer_id}`   | Delete customer                                        |
-| GET    | `/sales-orders/`             | List sales orders (paginated, with details & displays) |
+| GET    | `/sales-orders/`             | List sales orders (paginated, details & displays)      |
 | POST   | `/sales-orders/`             | Create sales order (auto doc_no, doc_duedate, totals)  |
 | GET    | `/sales-orders/{doc_id}`     | Get sales order by ID with details                     |
 | PUT    | `/sales-orders/{doc_id}`     | Update sales order                                     |
+| PATCH  | `/sales-orders/{doc_id}/state`| Transition sales order workflow state                 |
 | DELETE | `/sales-orders/{doc_id}`     | Delete sales order                                     |

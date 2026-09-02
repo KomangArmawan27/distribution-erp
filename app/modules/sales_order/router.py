@@ -3,9 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.sales_order.crud import sales_order_crud
+from app.modules.sales_order.models import OrderHeader
 from app.modules.customer.crud import customer_crud
 from app.modules.sales_person.crud import sales_person_crud
 from app.modules.item.crud import item_crud
+from app.modules.system.crud import change_document_state
+from app.modules.system.schemas import StateUpdateIn
 from app.core.database import get_db
 from app.modules.group.models import Group
 from app.core.pagination import build_links, pagination_dict
@@ -94,6 +97,25 @@ async def update_sales_order(doc_id: int, payload: OrderHeaderUpdate, request: R
     except ValueError as e:
         raise APIError(422, "VALIDATION_ERROR", "Validation failed", [{"field": "sales_order", "message": str(e)}])
     return success(OrderHeaderRead.model_validate(obj), "Sales order updated successfully", request)
+
+
+@router.patch("/{doc_id}/state", response_model=Envelope[OrderHeaderRead], response_model_exclude_none=True)
+async def update_sales_order_state(
+    doc_id: int,
+    body: StateUpdateIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    await change_document_state(
+        db,
+        doctype_id=1,
+        doc_id=doc_id,
+        to_seq=body.to_seq,
+        current_user=None,
+        model_cls=OrderHeader,
+    )
+    obj = await sales_order_crud.get(db, doc_id)
+    return success(OrderHeaderRead.model_validate(obj), "Sales order state updated successfully", request)
 
 
 @router.delete("/{doc_id}", status_code=204)

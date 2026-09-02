@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 
 from app.modules.group.router import router as group_router
+from app.modules.system.router import router as system_router
 from app.modules.item.router import router as item_router
 from app.modules.item_pricelist.router import router as price_router
 from app.modules.employee.router import router as employee_router
@@ -13,7 +14,7 @@ from app.core.response import APIError, error, meta, request_id
 
 load_dotenv()
 
-app = FastAPI(title="ERP Backend — Sales Order Module", version="0.1.0")
+app = FastAPI(title="ERP Backend — Sales Order Module & Flow State", version="0.1.0")
 
 
 @app.middleware("http")
@@ -45,6 +46,7 @@ async def health(request: Request):
 
 
 app.include_router(group_router)
+app.include_router(system_router)
 app.include_router(item_router)
 app.include_router(price_router)
 app.include_router(employee_router)

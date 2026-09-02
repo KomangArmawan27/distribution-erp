@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload, joinedload
 
 from app.core.base_crud import CRUDBase, PageResult
 from app.modules.group.crud import populate_group_displays
+from app.modules.system.crud import populate_flow_state_displays
 from app.core.pagination import compute_page_result
 from app.modules.group.models import Group
 from app.modules.sales_order.models import OrderHeader, OrderDetail
@@ -48,6 +49,7 @@ class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]
         obj = result.scalar_one_or_none()
         if obj:
             await populate_group_displays(db, [obj], ORDER_HEADER_GROUP_MAPPING)
+            await populate_flow_state_displays(db, [obj])
         return obj
 
     async def page(
@@ -79,6 +81,7 @@ class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]
 
         page_result = compute_page_result(list(rows), page, per_page, total_items, total_pages)
         await populate_group_displays(db, page_result.items, ORDER_HEADER_GROUP_MAPPING)
+        await populate_flow_state_displays(db, page_result.items)
         return page_result
 
     async def create(self, db: AsyncSession, obj_in: OrderHeaderCreate) -> OrderHeader:
@@ -93,6 +96,8 @@ class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]
         
         data["doc_no"] = await _generate_doc_no(db, doc_date)
         data["doc_duedate"] = await _get_doc_duedate(db, doc_date, doc_terms)
+        data["doctype_id"] = 1
+        data["doc_state"] = 1  # Default New Entry
         
         header = OrderHeader(**data)
         db.add(header)

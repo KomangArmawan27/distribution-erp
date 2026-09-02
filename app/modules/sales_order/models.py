@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, SmallInteger, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, ForeignKey, ForeignKeyConstraint, Numeric, SmallInteger, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -13,6 +13,12 @@ class OrderHeader(Base):
     __tablename__ = "order_header"
     __table_args__ = (
         UniqueConstraint("doc_no", name="uq_order_header_doc_no"),
+        CheckConstraint("doctype_id = 1", name="ck_order_header_doctype"),
+        ForeignKeyConstraint(
+            ["doctype_id", "doc_state"],
+            ["system.flow_state.doctype_id", "system.flow_state.docflow_seq"],
+            ondelete="RESTRICT",
+        ),
         {"schema": "sales"},
     )
 
@@ -21,6 +27,8 @@ class OrderHeader(Base):
     doc_date: Mapped[date] = mapped_column(Date, nullable=False)
     doc_duedate: Mapped[date] = mapped_column(Date, nullable=False)
     doc_terms: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    doctype_id: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    doc_state: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     cust_id: Mapped[int] = mapped_column(
         ForeignKey("sales.customer.customer_id", ondelete="RESTRICT"), nullable=False
     )

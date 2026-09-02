@@ -72,6 +72,9 @@ class OrderHeaderRead(BaseModel):
     doc_duedate: date
     doc_terms: int
     doc_terms_display: str | None = None
+    doctype_id: int
+    doc_state: int
+    doc_state_display: str | None = None
     cust_id: int
     dropship_id: int | None = None
     sales_id: int | None = None

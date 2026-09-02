@@ -1,4 +1,5 @@
 from app.modules.group.models import Group
+from app.modules.system.models import DocumentType, FlowState, FlowTransition
 from app.modules.item.models import Item
 from app.modules.item_pricelist.models import ItemPriceList
 from app.modules.employee.models import Employee
@@ -8,6 +9,9 @@ from app.modules.sales_order.models import OrderHeader, OrderDetail
 
 __all__ = [
     "Group",
+    "DocumentType",
+    "FlowState",
+    "FlowTransition",
     "Item",
     "ItemPriceList",
     "Employee",
