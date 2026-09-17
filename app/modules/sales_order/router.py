@@ -120,6 +120,17 @@ async def update_sales_order_state(
 
 @router.delete("/{doc_id}", status_code=204)
 async def delete_sales_order(doc_id: int, db: AsyncSession = Depends(get_db)):
+    obj = await sales_order_crud.get(db, doc_id)
+    if not obj:
+        raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {doc_id} not found")
+
+    if obj.doc_state > 1:
+        raise APIError(
+            409,
+            "DOCUMENT_STATE_LOCKED",
+            f"Cannot delete sales order in state '{getattr(obj, 'doc_state_display', None) or obj.doc_state}'. Only sales orders in 'New Entry' can be deleted.",
+        )
+
     ok = await sales_order_crud.delete(db, doc_id)
     if not ok:
         raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {doc_id} not found")
