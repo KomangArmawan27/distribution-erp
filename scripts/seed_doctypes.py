@@ -10,6 +10,7 @@ from app.modules.system.models import DocumentType, FlowState, FlowTransition
 
 INITIAL_DOCUMENT_TYPES = [
     (1, "SALES_ORDER", "Sales Order"),
+    (2, "PACKING_LIST", "Packing List"),
 ]
 
 INITIAL_FLOW_STATES = [
@@ -17,6 +18,10 @@ INITIAL_FLOW_STATES = [
     (1, 2, "Documented"),
     (1, 3, "Approved"),
     (1, 4, "Rejected"),
+    (2, 1, "New Entry"),
+    (2, 2, "Documented"),
+    (2, 3, "Approved"),
+    (2, 4, "Rejected"),
 ]
 
 INITIAL_FLOW_TRANSITIONS = [
@@ -24,6 +29,10 @@ INITIAL_FLOW_TRANSITIONS = [
     (1, 2, 3, "Approve", 1),
     (1, 2, 4, "Reject", 1),
     (1, 4, 1, "Reopen / Reset", 1),
+    (2, 1, 2, "Submit / Document", 1),
+    (2, 2, 3, "Approve", 1),
+    (2, 2, 4, "Reject", 1),
+    (2, 4, 1, "Reopen / Reset", 1),
 ]
 
 

@@ -76,6 +76,10 @@ class OrderHeaderRead(BaseModel):
     doc_state: int
     doc_state_display: str | None = None
     cust_id: int
+    customer_no: str | None = None
+    customer_name: str | None = None
     dropship_id: int | None = None
+    dropship_no: str | None = None
+    dropship_name: str | None = None
     sales_id: int | None = None
     details: list[OrderDetailRead] = []

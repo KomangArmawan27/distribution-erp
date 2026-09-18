@@ -46,6 +46,22 @@ class OrderHeader(Base):
         "OrderDetail", back_populates="header", cascade="all, delete-orphan", lazy="selectin"
     )
 
+    @property
+    def customer_no(self) -> str | None:
+        return self.customer.customer_no if self.customer else None
+
+    @property
+    def customer_name(self) -> str | None:
+        return self.customer.customer_name if self.customer else None
+
+    @property
+    def dropship_no(self) -> str | None:
+        return self.dropship_customer.customer_no if self.dropship_customer else None
+
+    @property
+    def dropship_name(self) -> str | None:
+        return self.dropship_customer.customer_name if self.dropship_customer else None
+
 
 class OrderDetail(Base):
     __tablename__ = "order_detail"
