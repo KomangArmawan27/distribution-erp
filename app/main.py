@@ -11,6 +11,7 @@ from app.modules.sales_person.router import router as sales_person_router
 from app.modules.customer.router import router as customer_router
 from app.modules.sales_order.router import router as sales_order_router
 from app.modules.packing_list.router import router as packing_list_router
+from app.modules.sales_invoice.router import router as sales_invoice_router
 from app.core.response import APIError, error, meta, request_id
 
 load_dotenv()
@@ -55,3 +56,4 @@ app.include_router(sales_person_router)
 app.include_router(customer_router)
 app.include_router(sales_order_router)
 app.include_router(packing_list_router)
+app.include_router(sales_invoice_router)
