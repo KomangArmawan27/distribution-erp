@@ -4,14 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.core.base_crud import CRUDBase, PageResult
-from app.modules.group.crud import populate_group_displays
-from app.modules.system.crud import populate_flow_state_displays
 from app.core.pagination import compute_page_result
 from app.core.response import APIError
 from app.modules.packing_list.models import PackingListHeader, PackingListDetail
 from app.modules.packing_list.schemas import PackingListHeaderCreate, PackingListHeaderUpdate
 from app.modules.sales_order.models import OrderHeader
-from app.modules.system.crud import change_document_state
+from app.modules.system.crud import change_document_state, populate_flow_state_displays
 
 
 async def _generate_packing_list_no(db: AsyncSession, doc_date: date) -> str:
@@ -34,7 +32,10 @@ class CRUDPackingList(CRUDBase[PackingListHeader, PackingListHeaderCreate, Packi
             joinedload(self.model.sales_order),
         ).where(self.pk_column == id_)
         result = await db.execute(stmt)
-        return result.scalar_one_or_none()
+        obj = result.scalar_one_or_none()
+        if obj:
+            await populate_flow_state_displays(db, [obj])
+        return obj
 
     async def page(
         self,
@@ -64,7 +65,9 @@ class CRUDPackingList(CRUDBase[PackingListHeader, PackingListHeaderCreate, Packi
         offset = (page - 1) * per_page
         rows = (await db.execute(stmt.order_by(pk.desc()).offset(offset).limit(per_page))).unique().scalars().all()
 
-        return compute_page_result(list(rows), page, per_page, total_items, total_pages)
+        page_result = compute_page_result(list(rows), page, per_page, total_items, total_pages)
+        await populate_flow_state_displays(db, page_result.items)
+        return page_result
 
     async def create(self, db: AsyncSession, obj_in: PackingListHeaderCreate) -> PackingListHeader:
         data = obj_in.model_dump()

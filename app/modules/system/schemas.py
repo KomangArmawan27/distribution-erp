@@ -22,11 +22,13 @@ class FlowStateCreate(BaseModel):
     doctype_id: int
     docflow_seq: int
     flow_state: str = Field(..., max_length=50)
+    is_final: bool = False
 
 
 class FlowStateUpdate(BaseModel):
     docflow_seq: int | None = None
     flow_state: str | None = Field(None, max_length=50)
+    is_final: bool | None = None
 
 
 class FlowStateRead(BaseModel):
@@ -34,6 +36,7 @@ class FlowStateRead(BaseModel):
     doctype_id: int
     docflow_seq: int
     flow_state: str
+    is_final: bool
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -11,6 +11,7 @@ from app.modules.system.models import DocumentType, FlowState, FlowTransition
 INITIAL_DOCUMENT_TYPES = [
     (1, "SALES_ORDER", "Sales Order"),
     (2, "PACKING_LIST", "Packing List"),
+    (3, "SALES_INVOICE", "Sales Invoice"),
 ]
 
 INITIAL_FLOW_STATES = [
@@ -20,8 +21,12 @@ INITIAL_FLOW_STATES = [
     (1, 4, "Rejected"),
     (2, 1, "New Entry"),
     (2, 2, "Documented"),
-    (2, 3, "Approved"),
+    (2, 3, "Posted"),
     (2, 4, "Rejected"),
+    (3, 1, "New Entry"),
+    (3, 2, "Documented"),
+    (3, 3, "Posted"),
+    (3, 4, "Rejected"),
 ]
 
 INITIAL_FLOW_TRANSITIONS = [
@@ -29,10 +34,17 @@ INITIAL_FLOW_TRANSITIONS = [
     (1, 2, 3, "Approve", 1),
     (1, 2, 4, "Reject", 1),
     (1, 4, 1, "Reopen / Reset", 1),
+    (1, 2, 1, "Revise", 1),
     (2, 1, 2, "Submit / Document", 1),
-    (2, 2, 3, "Approve", 1),
+    (2, 2, 3, "Posted", 1),
     (2, 2, 4, "Reject", 1),
     (2, 4, 1, "Reopen / Reset", 1),
+    (2, 2, 1, "Revise", 1),
+    (3, 1, 2, "Submit / Document", 1),
+    (3, 2, 3, "Posted", 1),
+    (3, 2, 4, "Reject", 1),
+    (3, 4, 1, "Reopen / Reset", 1),
+    (3, 2, 1, "Revise", 1),
 ]
 
 
@@ -54,14 +66,16 @@ async def seed():
 
             # 2. Seed Flow States
             for dt_id, seq, state_label in INITIAL_FLOW_STATES:
+                is_fin = (seq == 3)
                 stmt = select(FlowState).where(FlowState.doctype_id == dt_id, FlowState.docflow_seq == seq)
                 existing = (await session.execute(stmt)).scalar_one_or_none()
                 if not existing:
-                    session.add(FlowState(doctype_id=dt_id, docflow_seq=seq, flow_state=state_label))
-                    print(f"  [+] Added FlowState: DocType {dt_id}, Seq {seq} -> {state_label}")
+                    session.add(FlowState(doctype_id=dt_id, docflow_seq=seq, flow_state=state_label, is_final=is_fin))
+                    print(f"  [+] Added FlowState: DocType {dt_id}, Seq {seq} -> {state_label} (is_final={is_fin})")
                 else:
                     existing.flow_state = state_label
-                    print(f"  [=] Updated/Exists FlowState: DocType {dt_id}, Seq {seq} -> {state_label}")
+                    existing.is_final = is_fin
+                    print(f"  [=] Updated/Exists FlowState: DocType {dt_id}, Seq {seq} -> {state_label} (is_final={is_fin})")
 
             # 3. Seed Flow Transitions
             for dt_id, f_seq, t_seq, action, min_role in INITIAL_FLOW_TRANSITIONS:

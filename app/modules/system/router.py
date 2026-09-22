@@ -157,6 +157,17 @@ async def update_flow_state(flow_id: int, payload: FlowStateUpdate, request: Req
     changes = payload.model_dump(exclude_unset=True)
     new_seq = changes.get("docflow_seq", obj.docflow_seq)
     new_label = changes.get("flow_state", obj.flow_state)
+    new_is_final = changes.get("is_final", obj.is_final)
+
+    if new_is_final and not obj.is_final:
+        outgoing = (await db.execute(
+            select(FlowTransition).where(
+                FlowTransition.doctype_id == obj.doctype_id,
+                FlowTransition.from_seq == obj.docflow_seq
+            )
+        )).first()
+        if outgoing:
+            raise APIError(409, "FLOW_STATE_HAS_OUTGOING_TRANSITIONS", "Cannot mark state as final while it has outgoing transitions")
 
     if new_seq != obj.docflow_seq:
         seq_conflict = (await db.execute(
@@ -246,6 +257,8 @@ async def create_flow_transition(payload: FlowTransitionCreate, request: Request
     )).scalar_one_or_none()
     if not from_state:
         raise APIError(404, "FLOW_STATE_NOT_FOUND", f"Source flow state sequence {payload.from_seq} not found for doctype {payload.doctype_id}")
+    if from_state.is_final:
+        raise APIError(422, "CANNOT_TRANSITION_FROM_FINAL_STATE", "Cannot create transition from a final state")
 
     # 3. to_seq must exist in flow_state
     to_state = (await db.execute(

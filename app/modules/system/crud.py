@@ -66,6 +66,12 @@ async def change_document_state(
     if doc is None:
         raise APIError(404, "DOCUMENT_NOT_FOUND", f"Document {doc_id} not found")
 
+    current_state = (await db.execute(
+        select(FlowState).where(FlowState.doctype_id == doctype_id, FlowState.docflow_seq == doc.doc_state)
+    )).scalar_one_or_none()
+    if current_state and current_state.is_final:
+        raise APIError(409, "DOCUMENT_STATE_IS_FINAL", "Document state is final and cannot be changed")
+
     stmt = select(FlowTransition).where(
         FlowTransition.doctype_id == doctype_id,
         FlowTransition.from_seq == doc.doc_state,

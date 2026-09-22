@@ -67,5 +67,6 @@ class PackingListHeaderRead(BaseModel):
     dropship_name: str | None = None
     doctype_id: int
     doc_state: int
+    doc_state_display: str | None = None
     doc_date: date
     details: list[PackingListDetailRead] = []

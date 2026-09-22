@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, ForeignKeyConstraint, SmallInteger, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, ForeignKeyConstraint, SmallInteger, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -28,6 +28,7 @@ class FlowState(Base):
     doctype_id: Mapped[int] = mapped_column(ForeignKey("system.document_type.doctype_id"), nullable=False)
     docflow_seq: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     flow_state: Mapped[str] = mapped_column(String(50), nullable=False)
+    is_final: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class FlowTransition(Base):
