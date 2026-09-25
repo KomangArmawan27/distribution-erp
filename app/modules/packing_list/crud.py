@@ -148,13 +148,21 @@ async def advance_packing_list_state(
     if not header:
         raise APIError(404, "PACKING_LIST_NOT_FOUND", f"Packing list {packing_list_id} not found")
 
-    # Guard 1: Leaving state 1 (New Entry) -> sales_order_id must not be None
+    # Guard 1: Leaving state 1 (New Entry) -> sales_order_id must not be None and sales order must be approved/posted
     if header.doc_state == 1 and to_seq > 1:
         if header.sales_order_id is None:
             raise APIError(
                 422,
                 "TRANSITION_BLOCKED",
                 "sales_order_id is null; link a sales order before proceeding past 'New Entry'",
+            )
+        so_stmt = select(OrderHeader).where(OrderHeader.doc_id == header.sales_order_id)
+        so = (await db.execute(so_stmt)).scalar_one_or_none()
+        if so and so.doc_state != 3:
+            raise APIError(
+                422,
+                "TRANSITION_BLOCKED",
+                f"Sales order {so.doc_no} is not approved/posted. Cannot proceed past 'New Entry'.",
             )
 
     # Guard 2: Leaving state 2 (Documented) -> item set must exactly match linked sales order

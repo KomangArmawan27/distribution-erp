@@ -15,6 +15,7 @@ from app.modules.sales_invoice.schemas import (
     InvoiceHeaderUpdate,
 )
 from app.modules.sales_order.crud import sales_order_crud
+from app.modules.packing_list.models import PackingListHeader
 from app.modules.system.schemas import StateUpdateIn
 
 router = APIRouter(prefix="/sales-invoices", tags=["Sales Invoices"])
@@ -52,6 +53,24 @@ async def create_sales_invoice(payload: InvoiceHeaderCreate, request: Request, d
         so = await sales_order_crud.get(db, payload.sales_order_id)
         if not so:
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
+        if so.doc_state != 3:
+            raise APIError(
+                422,
+                "SALES_ORDER_NOT_APPROVED",
+                f"Sales order {payload.sales_order_id} must be approved/posted before creating a sales invoice",
+            )
+        existing_approved_pl = (await db.execute(
+            select(PackingListHeader).where(
+                PackingListHeader.sales_order_id == payload.sales_order_id,
+                PackingListHeader.doc_state == 3
+            )
+        )).scalar_one_or_none()
+        if not existing_approved_pl:
+            raise APIError(
+                422,
+                "PACKING_LIST_NOT_APPROVED",
+                f"Sales order {payload.sales_order_id} does not have an approved/posted packing list yet.",
+            )
         existing_inv = (await db.execute(
             select(InvoiceHeader).where(
                 InvoiceHeader.sales_order_id == payload.sales_order_id,
@@ -100,6 +119,24 @@ async def update_sales_invoice(
         so = await sales_order_crud.get(db, payload.sales_order_id)
         if not so:
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
+        if so.doc_state != 3:
+            raise APIError(
+                422,
+                "SALES_ORDER_NOT_APPROVED",
+                f"Sales order {payload.sales_order_id} must be approved before updating a sales invoice",
+            )
+        existing_approved_pl = (await db.execute(
+            select(PackingListHeader).where(
+                PackingListHeader.sales_order_id == payload.sales_order_id,
+                PackingListHeader.doc_state == 3
+            )
+        )).scalar_one_or_none()
+        if not existing_approved_pl:
+            raise APIError(
+                422,
+                "PACKING_LIST_NOT_APPROVED",
+                f"Sales order {payload.sales_order_id} does not have an posted packing list yet.",
+            )
         if payload.sales_order_id != obj.sales_order_id:
             existing_inv = (await db.execute(
                 select(InvoiceHeader).where(

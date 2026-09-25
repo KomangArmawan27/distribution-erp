@@ -10,6 +10,7 @@ from app.core.response import APIError
 from app.modules.sales_invoice.models import InvoiceHeader, InvoiceDetail
 from app.modules.sales_invoice.schemas import InvoiceHeaderCreate, InvoiceHeaderUpdate
 from app.modules.sales_order.models import OrderHeader
+from app.modules.packing_list.models import PackingListHeader
 from app.modules.customer.models import Customer
 from app.modules.item_pricelist.models import ItemPriceList
 from app.modules.system.crud import change_document_state, populate_flow_state_displays
@@ -207,13 +208,29 @@ async def advance_invoice_state(
     if not header:
         raise APIError(404, "INVOICE_NOT_FOUND", f"Sales invoice {invoice_id} not found")
 
-    # Guard 1: Leaving state 1 (New Entry) -> sales_order_id must not be None
+    # Guard 1: Leaving state 1 (New Entry) -> sales_order_id must not be None and upstream docs must be approved/posted
     if header.doc_state == 1 and to_seq > 1:
         if header.sales_order_id is None:
             raise APIError(
                 422,
                 "TRANSITION_BLOCKED",
                 "sales_order_id is null; link a sales order before proceeding past 'New Entry'",
+            )
+        so_stmt = select(OrderHeader).where(OrderHeader.doc_id == header.sales_order_id)
+        so = (await db.execute(so_stmt)).scalar_one_or_none()
+        if so and so.doc_state != 3:
+            raise APIError(
+                422,
+                "TRANSITION_BLOCKED",
+                f"Sales order {so.doc_no} is not approved/posted. Cannot proceed past 'New Entry'.",
+            )
+        pl_stmt = select(PackingListHeader).where(PackingListHeader.sales_order_id == header.sales_order_id, PackingListHeader.doc_state == 3)
+        approved_pl = (await db.execute(pl_stmt)).scalars().first()
+        if not approved_pl:
+            raise APIError(
+                422,
+                "TRANSITION_BLOCKED",
+                "Linked packing list is not approved/posted. Cannot proceed past 'New Entry'.",
             )
 
     # Guard 2: Leaving state 2 (Documented) -> item set must exactly match linked sales order

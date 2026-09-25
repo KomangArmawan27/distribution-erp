@@ -100,6 +100,12 @@ async def update_packing_list(
         so = await sales_order_crud.get(db, payload.sales_order_id)
         if not so:
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
+        if so.doc_state != 3:
+            raise APIError(
+                422,
+                "SALES_ORDER_NOT_APPROVED",
+                f"Sales order {payload.sales_order_id} must be approved before updating a packing list",
+            )
         if payload.sales_order_id != obj.sales_order_id:
             existing_pl = (await db.execute(
                 select(PackingListHeader).where(
