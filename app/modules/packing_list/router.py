@@ -50,8 +50,14 @@ async def get_packing_list(packing_list_id: int, request: Request, db: AsyncSess
 async def create_packing_list(payload: PackingListHeaderCreate, request: Request, db: AsyncSession = Depends(get_db)):
     if payload.sales_order_id is not None:
         so = await sales_order_crud.get(db, payload.sales_order_id)
-        if not so:
+        if not so or so.doc_state in (4, 5):
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
+        if so.doc_state != 3:
+            raise APIError(
+                422,
+                "SALES_ORDER_NOT_APPROVED",
+                f"Sales order {payload.sales_order_id} must be approved/posted before creating a packing list",
+            )
         existing_pl = (await db.execute(
             select(PackingListHeader).where(
                 PackingListHeader.sales_order_id == payload.sales_order_id,
@@ -98,7 +104,7 @@ async def update_packing_list(
 
     if payload.sales_order_id is not None:
         so = await sales_order_crud.get(db, payload.sales_order_id)
-        if not so:
+        if not so or so.doc_state in (4, 5):
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
         if so.doc_state != 3:
             raise APIError(

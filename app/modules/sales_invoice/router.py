@@ -51,7 +51,7 @@ async def get_sales_invoice(invoice_id: int, request: Request, db: AsyncSession 
 async def create_sales_invoice(payload: InvoiceHeaderCreate, request: Request, db: AsyncSession = Depends(get_db)):
     if payload.sales_order_id is not None:
         so = await sales_order_crud.get(db, payload.sales_order_id)
-        if not so:
+        if not so or so.doc_state in (4, 5):
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
         if so.doc_state != 3:
             raise APIError(
@@ -117,7 +117,7 @@ async def update_sales_invoice(
 
     if payload.sales_order_id is not None:
         so = await sales_order_crud.get(db, payload.sales_order_id)
-        if not so:
+        if not so or so.doc_state in (4, 5):
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
         if so.doc_state != 3:
             raise APIError(
