@@ -65,3 +65,5 @@ class FlowTransitionRead(BaseModel):
 
 class StateUpdateIn(BaseModel):
     to_seq: int
+    confirm_return: bool = False
+    preview: bool = False

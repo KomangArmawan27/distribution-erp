@@ -11,7 +11,6 @@ class PackingListHeader(Base):
     __tablename__ = "packing_list_header"
     __table_args__ = (
         UniqueConstraint("packing_list_no", name="uq_packing_list_header_no"),
-        UniqueConstraint("sales_order_id", name="uq_packing_list_header_sales_order"),
         CheckConstraint("doctype_id = 2", name="ck_packing_list_header_doctype"),
         ForeignKeyConstraint(
             ["doctype_id", "doc_state"],

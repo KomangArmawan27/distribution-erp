@@ -53,7 +53,10 @@ async def create_sales_invoice(payload: InvoiceHeaderCreate, request: Request, d
         if not so:
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
         existing_inv = (await db.execute(
-            select(InvoiceHeader).where(InvoiceHeader.sales_order_id == payload.sales_order_id)
+            select(InvoiceHeader).where(
+                InvoiceHeader.sales_order_id == payload.sales_order_id,
+                InvoiceHeader.doc_state != 5
+            )
         )).scalar_one_or_none()
         if existing_inv:
             raise APIError(
@@ -99,7 +102,10 @@ async def update_sales_invoice(
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
         if payload.sales_order_id != obj.sales_order_id:
             existing_inv = (await db.execute(
-                select(InvoiceHeader).where(InvoiceHeader.sales_order_id == payload.sales_order_id)
+                select(InvoiceHeader).where(
+                    InvoiceHeader.sales_order_id == payload.sales_order_id,
+                    InvoiceHeader.doc_state != 5
+                )
             )).scalar_one_or_none()
             if existing_inv:
                 raise APIError(

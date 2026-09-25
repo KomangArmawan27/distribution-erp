@@ -19,32 +19,35 @@ INITIAL_FLOW_STATES = [
     (1, 2, "Documented"),
     (1, 3, "Approved"),
     (1, 4, "Rejected"),
+    (1, 5, "Cancelled"),
     (2, 1, "New Entry"),
     (2, 2, "Documented"),
     (2, 3, "Posted"),
     (2, 4, "Rejected"),
+    (2, 5, "Cancelled"),
     (3, 1, "New Entry"),
     (3, 2, "Documented"),
     (3, 3, "Posted"),
     (3, 4, "Rejected"),
+    (3, 5, "Cancelled"),
 ]
 
 INITIAL_FLOW_TRANSITIONS = [
     (1, 1, 2, "Submit / Document", 1),
     (1, 2, 3, "Approve", 1),
     (1, 2, 4, "Reject", 1),
-    (1, 4, 1, "Reopen / Reset", 1),
     (1, 2, 1, "Revise", 1),
+    (1, 3, 5, "Cancel", 1),
     (2, 1, 2, "Submit / Document", 1),
     (2, 2, 3, "Posted", 1),
     (2, 2, 4, "Reject", 1),
-    (2, 4, 1, "Reopen / Reset", 1),
     (2, 2, 1, "Revise", 1),
+    (2, 3, 5, "Cancel", 1),
     (3, 1, 2, "Submit / Document", 1),
     (3, 2, 3, "Posted", 1),
     (3, 2, 4, "Reject", 1),
-    (3, 4, 1, "Reopen / Reset", 1),
     (3, 2, 1, "Revise", 1),
+    (3, 3, 5, "Cancel", 1),
 ]
 
 
@@ -66,7 +69,7 @@ async def seed():
 
             # 2. Seed Flow States
             for dt_id, seq, state_label in INITIAL_FLOW_STATES:
-                is_fin = (seq == 3)
+                is_fin = (seq in (4, 5))
                 stmt = select(FlowState).where(FlowState.doctype_id == dt_id, FlowState.docflow_seq == seq)
                 existing = (await session.execute(stmt)).scalar_one_or_none()
                 if not existing:

@@ -12,7 +12,6 @@ class InvoiceHeader(Base):
     __tablename__ = "invoice_header"
     __table_args__ = (
         UniqueConstraint("invoice_no", name="uq_invoice_header_no"),
-        UniqueConstraint("sales_order_id", name="uq_invoice_header_sales_order"),
         CheckConstraint("doctype_id = 3", name="ck_invoice_header_doctype"),
         ForeignKeyConstraint(
             ["doctype_id", "doc_state"],

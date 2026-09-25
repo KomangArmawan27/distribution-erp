@@ -233,6 +233,7 @@ async def advance_invoice_state(
                         f"Item mismatch with linked sales order. Missing items: {list(missing)}, Extra items: {list(extra)}",
                     )
 
+
     await change_document_state(
         db,
         doctype_id=3,
@@ -241,4 +242,5 @@ async def advance_invoice_state(
         current_user=None,
         model_cls=InvoiceHeader,
     )
+    await db.commit()
     return await sales_invoice_crud.get(db, invoice_id)

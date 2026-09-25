@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.sales_order.crud import sales_order_crud
+from app.modules.sales_order.crud import sales_order_crud, advance_sales_order_state, cancel_order_cascade
 from app.modules.sales_order.models import OrderHeader
 from app.modules.customer.crud import customer_crud
 from app.modules.sales_person.crud import sales_person_crud
@@ -106,16 +106,19 @@ async def update_sales_order_state(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    await change_document_state(
-        db,
-        doctype_id=1,
-        doc_id=doc_id,
-        to_seq=body.to_seq,
-        current_user=None,
-        model_cls=OrderHeader,
-    )
-    obj = await sales_order_crud.get(db, doc_id)
+    obj = await advance_sales_order_state(db, doc_id, body.to_seq)
     return success(OrderHeaderRead.model_validate(obj), "Sales order state updated successfully", request)
+
+
+@router.post("/{doc_id}/cancel-cascade", response_model=Envelope[dict], response_model_exclude_none=True)
+async def cancel_order_cascade_endpoint(
+    doc_id: int,
+    body: StateUpdateIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await cancel_order_cascade(db, doc_id, confirm=body.confirm_return, preview=body.preview)
+    return success(result, "Cancel cascade executed or previewed successfully", request)
 
 
 @router.delete("/{doc_id}", status_code=204)

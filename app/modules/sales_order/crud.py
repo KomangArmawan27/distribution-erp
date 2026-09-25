@@ -10,7 +10,11 @@ from app.modules.system.crud import populate_flow_state_displays
 from app.core.pagination import compute_page_result
 from app.modules.group.models import Group
 from app.modules.sales_order.models import OrderHeader, OrderDetail
-from app.modules.sales_order.schemas import OrderHeaderCreate, OrderHeaderUpdate
+from app.modules.sales_order.schemas import OrderHeaderCreate, OrderHeaderUpdate, OrderHeaderRead
+from app.modules.packing_list.models import PackingListHeader
+from app.modules.sales_invoice.models import InvoiceHeader
+from app.modules.system.crud import change_document_state
+from app.core.response import APIError
 
 ORDER_HEADER_GROUP_MAPPING = {
     "doc_terms": "CUSTOMER TOP",
@@ -122,6 +126,15 @@ class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]
         return await self.get(db, header.doc_id)
 
     async def update(self, db: AsyncSession, db_obj: OrderHeader, obj_in: OrderHeaderUpdate) -> OrderHeader:
+        existing_pl = (await db.execute(
+            select(PackingListHeader).where(
+                PackingListHeader.sales_order_id == db_obj.doc_id,
+                PackingListHeader.doc_state.not_in([4, 5])
+            )
+        )).scalar_one_or_none()
+        if existing_pl:
+            raise ValueError("Sales Order cannot be edited because a non-cancelled/rejected Packing List exists against it.")
+
         data = obj_in.model_dump(exclude_unset=True)
         details_data = data.pop("details", None)
 
@@ -158,3 +171,115 @@ class CRUDSalesOrder(CRUDBase[OrderHeader, OrderHeaderCreate, OrderHeaderUpdate]
 
 
 sales_order_crud = CRUDSalesOrder(OrderHeader)
+
+
+async def advance_sales_order_state(
+    db: AsyncSession,
+    doc_id: int,
+    to_seq: int,
+) -> OrderHeader:
+    header = await sales_order_crud.get(db, doc_id)
+    if not header:
+        raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {doc_id} not found")
+
+    if to_seq == 5:
+        pl_stmt = select(PackingListHeader).where(PackingListHeader.sales_order_id == doc_id, PackingListHeader.doc_state == 3)
+        approved_pl = (await db.execute(pl_stmt)).scalars().first()
+        if approved_pl:
+            raise APIError(
+                422,
+                "TRANSITION_BLOCKED",
+                f"Cannot cancel — Packing List {approved_pl.packing_list_no} is still approved/posted. Cancel it first.",
+            )
+
+        inv_stmt = select(InvoiceHeader).where(InvoiceHeader.sales_order_id == doc_id, InvoiceHeader.doc_state == 3)
+        approved_inv = (await db.execute(inv_stmt)).scalars().first()
+        if approved_inv:
+            raise APIError(
+                422,
+                "TRANSITION_BLOCKED",
+                f"Cannot cancel — Sales Invoice {approved_inv.invoice_no} is still approved/posted. Cancel it first.",
+            )
+
+    await change_document_state(
+        db,
+        doctype_id=1,
+        doc_id=doc_id,
+        to_seq=to_seq,
+        current_user=None,
+        model_cls=OrderHeader,
+    )
+    return await sales_order_crud.get(db, doc_id)
+
+
+async def cancel_order_cascade(
+    db: AsyncSession,
+    sales_order_id: int,
+    confirm: bool = False,
+    preview: bool = True,
+) -> dict:
+    so = await sales_order_crud.get(db, sales_order_id)
+    if not so:
+        raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {sales_order_id} not found")
+
+    invs = (await db.execute(select(InvoiceHeader).where(InvoiceHeader.sales_order_id == sales_order_id))).scalars().all()
+    pls = (await db.execute(select(PackingListHeader).where(PackingListHeader.sales_order_id == sales_order_id))).scalars().all()
+
+    actions = []
+    for inv in invs:
+        if inv.doc_state in (4, 5):
+            continue
+        if inv.doc_state == 3:
+            actions.append(f"Create credit note for Invoice {inv.invoice_no}")
+            actions.append(f"Cancel Sales Invoice {inv.invoice_no}")
+        else:
+            actions.append(f"Reject Sales Invoice {inv.invoice_no}")
+
+    for pl in pls:
+        if pl.doc_state in (4, 5):
+            continue
+        if pl.doc_state == 3:
+            actions.append(f"Create return for Packing List {pl.packing_list_no} (qty returning to stock)")
+            actions.append(f"Cancel Packing List {pl.packing_list_no}")
+        else:
+            actions.append(f"Reject Packing List {pl.packing_list_no}")
+
+    if so.doc_state not in (4, 5):
+        actions.append(f"Cancel Sales Order {so.doc_no}")
+
+    if preview or not confirm:
+        return {
+            "preview": True,
+            "message": "Review cancellation summary before executing.",
+            "actions": actions,
+        }
+
+    from app.modules.sales_invoice.crud import advance_invoice_state
+    from app.modules.packing_list.crud import advance_packing_list_state
+
+    for inv in invs:
+        if inv.doc_state in (4, 5):
+            continue
+        if inv.doc_state == 3:
+            await advance_invoice_state(db, inv.invoice_id, 5)
+        else:
+            await change_document_state(db, doctype_id=3, doc_id=inv.invoice_id, to_seq=4, current_user=None, model_cls=InvoiceHeader)
+
+    for pl in pls:
+        if pl.doc_state in (4, 5):
+            continue
+        if pl.doc_state == 3:
+            await advance_packing_list_state(db, pl.packing_list_id, 5, confirm_return=True)
+        else:
+            await change_document_state(db, doctype_id=2, doc_id=pl.packing_list_id, to_seq=4, current_user=None, model_cls=PackingListHeader)
+
+    if so.doc_state not in (4, 5):
+        await advance_sales_order_state(db, sales_order_id, 5)
+
+    await db.commit()
+    updated_so = await sales_order_crud.get(db, sales_order_id)
+    return {
+        "preview": False,
+        "message": "Cancel order cascade completed successfully.",
+        "sales_order": OrderHeaderRead.model_validate(updated_so),
+    }

@@ -53,7 +53,10 @@ async def create_packing_list(payload: PackingListHeaderCreate, request: Request
         if not so:
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
         existing_pl = (await db.execute(
-            select(PackingListHeader).where(PackingListHeader.sales_order_id == payload.sales_order_id)
+            select(PackingListHeader).where(
+                PackingListHeader.sales_order_id == payload.sales_order_id,
+                PackingListHeader.doc_state != 5
+            )
         )).scalar_one_or_none()
         if existing_pl:
             raise APIError(
@@ -99,7 +102,10 @@ async def update_packing_list(
             raise APIError(404, "SALES_ORDER_NOT_FOUND", f"Sales order {payload.sales_order_id} not found")
         if payload.sales_order_id != obj.sales_order_id:
             existing_pl = (await db.execute(
-                select(PackingListHeader).where(PackingListHeader.sales_order_id == payload.sales_order_id)
+                select(PackingListHeader).where(
+                    PackingListHeader.sales_order_id == payload.sales_order_id,
+                    PackingListHeader.doc_state != 5
+                )
             )).scalar_one_or_none()
             if existing_pl:
                 raise APIError(
@@ -129,7 +135,7 @@ async def update_packing_list_state(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    obj = await advance_packing_list_state(db, packing_list_id, body.to_seq)
+    obj = await advance_packing_list_state(db, packing_list_id, body.to_seq, confirm_return=body.confirm_return)
     return success(PackingListHeaderRead.model_validate(obj), "Packing list state updated successfully", request)
 
 

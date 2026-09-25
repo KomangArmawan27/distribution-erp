@@ -9,6 +9,7 @@ from app.core.response import APIError
 from app.modules.packing_list.models import PackingListHeader, PackingListDetail
 from app.modules.packing_list.schemas import PackingListHeaderCreate, PackingListHeaderUpdate
 from app.modules.sales_order.models import OrderHeader
+from app.modules.sales_invoice.models import InvoiceHeader
 from app.modules.system.crud import change_document_state, populate_flow_state_displays
 
 
@@ -99,6 +100,17 @@ class CRUDPackingList(CRUDBase[PackingListHeader, PackingListHeaderCreate, Packi
         return await self.get(db, header.packing_list_id)
 
     async def update(self, db: AsyncSession, db_obj: PackingListHeader, obj_in: PackingListHeaderUpdate) -> PackingListHeader:
+        effective_so_id = obj_in.sales_order_id if obj_in.sales_order_id is not None else db_obj.sales_order_id
+        if effective_so_id is not None:
+            existing_inv = (await db.execute(
+                select(InvoiceHeader).where(
+                    InvoiceHeader.sales_order_id == effective_so_id,
+                    InvoiceHeader.doc_state.not_in([4, 5])
+                )
+            )).scalar_one_or_none()
+            if existing_inv:
+                raise ValueError("Packing List cannot be edited because a non-cancelled/rejected Sales Invoice exists against it.")
+
         data = obj_in.model_dump(exclude_unset=True)
         details_data = data.pop("details", None)
 
@@ -130,6 +142,7 @@ async def advance_packing_list_state(
     db: AsyncSession,
     packing_list_id: int,
     to_seq: int,
+    confirm_return: bool = False,
 ) -> PackingListHeader:
     header = await packing_list_crud.get(db, packing_list_id)
     if not header:
@@ -160,6 +173,25 @@ async def advance_packing_list_state(
                         "ITEM_MISMATCH",
                         f"Item mismatch with linked sales order. Missing items: {list(missing)}, Extra items: {list(extra)}",
                     )
+
+    # Guard 3: Transitioning to cancelled (5) from posted (3)
+    if header.doc_state == 3 and to_seq == 5:
+        if header.sales_order_id is not None:
+            inv_stmt = select(InvoiceHeader).where(InvoiceHeader.sales_order_id == header.sales_order_id, InvoiceHeader.doc_state == 3)
+            approved_inv = (await db.execute(inv_stmt)).scalars().first()
+            if approved_inv:
+                raise APIError(
+                    422,
+                    "TRANSITION_BLOCKED",
+                    f"Cannot cancel — Sales Invoice {approved_inv.invoice_no} is still approved/posted. Cancel it first.",
+                )
+
+        if not confirm_return:
+            raise APIError(
+                422,
+                "CONFIRMATION_REQUIRED",
+                "Explicit confirmation that goods are physically returned is required before cancelling an approved packing list.",
+            )
 
     await change_document_state(
         db,
